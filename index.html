@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+   
+    <title>專屬空間沙龍 - 專業旗艦版 POS (v18.5 Ultimate)</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="專屬空間沙龍">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans TC', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #334155; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; transition: all 0.2s; }
+        .card:hover { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); transform: translateY(-2px); }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .input-field { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.6rem 1rem; outline: none; transition: all 0.2s; background-color: #f8fafc; font-size: 0.95rem; }
+        .input-field:focus { border-color: #6366f1; background-color: white; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: 600; transition: all 0.2s; cursor: pointer; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: white; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); }
+        .btn-primary:hover { box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3); filter: brightness(1.1); }
+        .btn-secondary { background: white; border: 1px solid #e2e8f0; color: #475569; }
+        .btn-secondary:hover { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
+        .btn-danger { background: #fee2e2; color: #ef4444; }
+        .btn-danger:hover { background: #fecaca; color: #dc2626; }
+        .bar-container { background-color: #f1f5f9; border-radius: 9999px; height: 0.75rem; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 9999px; transition: width 1s ease-in-out; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // --- 1. Icons ---
+        const Icon = ({ children, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const Icons = {
+            Scissors: (p)=><Icon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></Icon>,
+            User: (p)=><Icon {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></Icon>,
+            Settings: (p)=><Icon {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></Icon>,
+            Plus: (p)=><Icon {...p}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>,
+            Trash2: (p)=><Icon {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></Icon>,
+            CreditCard: (p)=><Icon {...p}><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></Icon>,
+            Banknote: (p)=><Icon {...p}><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></Icon>,
+            Smartphone: (p)=><Icon {...p}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></Icon>,
+            CheckCircle: (p)=><Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>,
+            Menu: (p)=><Icon {...p}><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></Icon>,
+            X: (p)=><Icon {...p}><path d="M18 6 6 18"/><path d="M6 6l12 12"/></Icon>,
+            Box: (p)=><Icon {...p}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></Icon>,
+            Search: (p)=><Icon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>,
+            UserPlus: (p)=><Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></Icon>,
+            Save: (p)=><Icon {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Icon>,
+            Download: (p)=><Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>,
+            Upload: (p)=><Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>,
+            Table: (p)=><Icon {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="12" x2="12" y1="3" y2="21"/></Icon>,
+            Hand: (p)=><Icon {...p}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></Icon>,
+            Edit: (p)=><Icon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Icon>,
+            LogOut: (p)=><Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></Icon>,
+            RefreshCw: (p)=><Icon {...p}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></Icon>,
+            UserCog: (p)=><Icon {...p}><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4.9-.9"/><path d="m15.3 16.4-.9-.9"/><path d="m21.7 13.6.9.9"/><path d="m15.3 13.6-.9.9"/><path d="m18 12v-1"/><path d="m18 19v-1"/></Icon>,
+            Tag: (p)=><Icon {...p}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></Icon>,
+            PauseCircle: (p)=><Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></Icon>,
+            PlayCircle: (p)=><Icon {...p}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></Icon>,
+            Truck: (p)=><Icon {...p}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></Icon>,
+            DollarSign: (p)=><Icon {...p}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></Icon>,
+            Briefcase: (p)=><Icon {...p}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></Icon>,
+            Activity: (p)=><Icon {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></Icon>,
+            Droplets: (p)=><Icon {...p}><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.8-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.35" opacity=".5"/></Icon>,
+            Zap: (p)=><Icon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Icon>,
+            Wifi: (p)=><Icon {...p}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></Icon>,
+            Phone: (p)=><Icon {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></Icon>,
+            Wallet: (p)=><Icon {...p}><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></Icon>,
+            Coffee: (p)=><Icon {...p}><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></Icon>,
+            TrendingUp: (p)=><Icon {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></Icon>,
+            ClipboardList: (p)=><Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>,
+            Palette: (p)=><Icon {...p}><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></Icon>
+        };
+        const { Scissors, User, Settings, Plus, Trash2, CreditCard, Banknote, Smartphone, CheckCircle, Menu, X, Box, Search, UserPlus, Save, Download, Upload, Table, Hand, Edit, LogOut, RefreshCw, UserCog, Tag, PauseCircle, PlayCircle, Truck, DollarSign, Briefcase, Activity, Droplets, Zap, Wifi, Phone, Wallet, Coffee, TrendingUp, ClipboardList, Palette } = Icons;
+
+        // --- 2. Utils ---
+        const formatCurrency = (n) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(n);
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+        const getCurrentDateTimeLocal = () => {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            return now.toISOString().slice(0, 16);
+        };
+        const getCurrentDateLocal = () => {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            return now.toISOString().slice(0, 10);
+        };
+
+        // --- 3. Defaults & Color Themes ---
+        const DEFAULT_CATEGORIES = ['剪髮', '洗髮', '染燙', '護理', '造型', '產品'];
+        const DEFAULT_EXPENSE_TYPES = ['水費', '電費', '電話費', '網路費', '房租', '自領料(成本)', '雜支', '員工借支'];
+        const DEFAULT_COMMISSION = { '剪髮': 50, '洗髮': 30, '染燙': 45, '護理': 45, '造型': 45, '產品': 10 };
+        const DEFAULT_GENDER_COLORS = { '男': 'blue', '女': 'rose', '兒童': 'emerald' };
+        
+        // 定義可選的顏色主題 (theme.fill = 長條圖顏色)
+        const COLOR_THEMES = {
+            'slate':  { label: '質感灰', bg: 'bg-slate-50', border: 'border-slate-200', hover: 'hover:border-slate-400 hover:bg-slate-100', text: 'text-slate-600', badge: 'bg-slate-100 text-slate-600', accent: 'border-l-slate-400', card_filled: 'bg-slate-50 border-slate-200', fill: '#64748b' },
+            'red':    { label: '熱情紅', bg: 'bg-red-50', border: 'border-red-200', hover: 'hover:border-red-400 hover:bg-red-100', text: 'text-red-600', badge: 'bg-red-100 text-red-600', accent: 'border-l-red-500', card_filled: 'bg-red-50 border-red-200', fill: '#ef4444' },
+            'orange': { label: '活力橘', bg: 'bg-orange-50', border: 'border-orange-200', hover: 'hover:border-orange-400 hover:bg-orange-100', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-600', accent: 'border-l-orange-500', card_filled: 'bg-orange-50 border-orange-200', fill: '#f97316' },
+            'amber':  { label: '琥珀黃', bg: 'bg-amber-50', border: 'border-amber-200', hover: 'hover:border-amber-400 hover:bg-amber-100', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-600', accent: 'border-l-amber-500', card_filled: 'bg-orange-50 border-orange-200', fill: '#f59e0b' },
+            'emerald':{ label: '翡翠綠', bg: 'bg-emerald-50', border: 'border-emerald-200', hover: 'hover:border-emerald-400 hover:bg-emerald-100', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-600', accent: 'border-l-emerald-500', card_filled: 'bg-emerald-50 border-emerald-200', fill: '#10b981' },
+            'teal':   { label: '藍綠色', bg: 'bg-teal-50', border: 'border-teal-200', hover: 'hover:border-teal-400 hover:bg-teal-100', text: 'text-teal-600', badge: 'bg-teal-100 text-teal-600', accent: 'border-l-teal-500', card_filled: 'bg-teal-50 border-teal-200', fill: '#14b8a6' },
+            'cyan':   { label: '青色',   bg: 'bg-cyan-50', border: 'border-cyan-200', hover: 'hover:border-cyan-400 hover:bg-cyan-100', text: 'text-cyan-600', badge: 'bg-cyan-100 text-cyan-600', accent: 'border-l-cyan-500', card_filled: 'bg-cyan-50 border-cyan-200', fill: '#06b6d4' },
+            'blue':   { label: '海洋藍', bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:border-blue-400 hover:bg-blue-100', text: 'text-blue-600', badge: 'bg-blue-100 text-blue-600', accent: 'border-l-blue-500', card_filled: 'bg-blue-50 border-blue-200', fill: '#3b82f6' },
+            'indigo': { label: '靛青藍', bg: 'bg-indigo-50', border: 'border-indigo-200', hover: 'hover:border-indigo-400 hover:bg-indigo-100', text: 'text-indigo-600', badge: 'bg-indigo-100 text-indigo-600', accent: 'border-l-indigo-500', card_filled: 'bg-indigo-50 border-indigo-200', fill: '#6366f1' },
+            'violet': { label: '紫羅蘭', bg: 'bg-violet-50', border: 'border-violet-200', hover: 'hover:border-violet-400 hover:bg-violet-100', text: 'text-violet-600', badge: 'bg-violet-100 text-violet-600', accent: 'border-l-violet-500', card_filled: 'bg-violet-50 border-violet-200', fill: '#8b5cf6' },
+            'purple': { label: '魔幻紫', bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:border-purple-400 hover:bg-purple-100', text: 'text-purple-600', badge: 'bg-purple-100 text-purple-600', accent: 'border-l-purple-500', card_filled: 'bg-purple-50 border-purple-200', fill: '#a855f7' },
+            'rose':   { label: '玫瑰粉', bg: 'bg-rose-50', border: 'border-rose-200', hover: 'hover:border-rose-400 hover:bg-rose-100', text: 'text-rose-600', badge: 'bg-rose-100 text-rose-600', accent: 'border-l-rose-500', card_filled: 'bg-rose-50 border-rose-200', fill: '#f43f5e' },
+        };
+
+        const DEFAULT_SERVICES = [
+            { id: 's1', name: '精緻剪髮', price: 600, category: '剪髮', cost: 0, stock: null, isProduct: false },
+            { id: 's4', name: '基礎染髮', price: 1800, category: '染燙', cost: 300, stock: null, isProduct: false },
+            { id: 'p1', name: '保濕洗髮精 (500ml)', price: 800, category: '產品', cost: 400, stock: 10, isProduct: true },
+        ];
+        const DEFAULT_STYLISTS = [
+            { id: 'st1', name: 'Eason', role: '設計師', baseSalary: 25000, positionBonus: 5000, attendanceBonus: 3000, commissionRate: 0, useGlobalCommission: true },
+            { id: 'st3', name: '小安', role: '助理', baseSalary: 24000, positionBonus: 0, attendanceBonus: 2000, commissionRate: 0, useGlobalCommission: true },
+        ];
+
+        // --- 4. Hook ---
+        function useStickyState(key, defaultValue) {
+            const [value, setValue] = useState(() => {
+                try {
+                    const stickyValue = window.localStorage.getItem(key);
+                    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+                } catch (e) { return defaultValue; }
+            });
+            useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
+            return [value, setValue];
+        }
+
+        // --- 5. Components ---
+        const Modal = ({ title, onClose, children, size="max-w-md" }) => (
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                <div className={`bg-white rounded-2xl w-full ${size} p-6 shadow-2xl flex flex-col max-h-[90vh]`}>
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h3 className="text-xl font-bold text-slate-800">{title}</h3>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto pr-2">{children}</div>
+                </div>
+            </div>
+        );
+
+        const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">{title}</h3>
+                        <p className="text-slate-600 mb-6">{message}</p>
+                        <div className="flex gap-3">
+                            <button onClick={onCancel} className="btn btn-secondary flex-1">取消</button>
+                            <button onClick={onConfirm} className="btn btn-danger flex-1">確定</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const QuickCustomerForm = ({ onSave, onCancel, stylists = [] }) => {
+            const [form, setForm] = useState({ name: '', phone: '', notes: '', preferredStylistId: '', gender: '女' });
+            return (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                        <input className="input-field" placeholder="姓名" value={form.name} onChange={e => setForm({...form, name: e.target.value})}/>
+                        <div className="flex gap-2">
+                            <input className="input-field flex-1" placeholder="電話" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}/>
+                            <select className="input-field w-24" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}>
+                                <option value="女">女客</option>
+                                <option value="男">男客</option>
+                                <option value="兒童">兒童</option>
+                            </select>
+                        </div>
+                        <div className="border p-2 rounded-lg bg-slate-50">
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師 (歸戶用)</label>
+                            <select 
+                                className="input-field"
+                                value={form.preferredStylistId}
+                                onChange={e => setForm({...form, preferredStylistId: e.target.value})}
+                            >
+                                <option value="">未指定 (全店客人)</option>
+                                {stylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        <textarea className="input-field" placeholder="備註" rows="3" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})}/>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button onClick={() => onSave(form)} className="btn btn-primary flex-1">建立</button>
+                        <button onClick={onCancel} className="btn btn-secondary flex-1">取消</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatCard = ({ title, value, subValue, icon: IconColor, colorClass }) => (
+            <div className={`card p-6 border-l-4 ${colorClass}`}>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <div className="text-slate-400 text-sm font-bold mb-1 uppercase tracking-wide">{title}</div>
+                        <div className="text-3xl font-black text-slate-800">{value}</div>
+                        {subValue && <div className="text-sm text-slate-500 mt-1 font-medium">{subValue}</div>}
+                    </div>
+                    <div className={`p-3 rounded-xl bg-opacity-10 ${colorClass.replace('border-', 'bg-').replace('500', '100')}`}>
+                        <IconColor className={`w-6 h-6 ${colorClass.replace('border-', 'text-')}`} />
+                    </div>
+                </div>
+            </div>
+        );
+
+       // --- 6. App ---
+const GAS_URL = "https://script.google.com/macros/s/AKfycbz7INcC1Cv1QYEV28GthSpXUiSeKtFKoDaZdWgZbtBaI_4XRta-H020Mz8t1beIgztc6g/exec"
+function HairSalonApp() {
+    const [activeTab, setActiveTab] = useState('pos');
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [notification, setNotification] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false); // 新增同步狀態指標
+
+    // States (維持原有的定義)
+    const [services, setServices] = useStickyState('salon_services', DEFAULT_SERVICES);
+    const [stylists, setStylists] = useStickyState('salon_stylists', DEFAULT_STYLISTS);
+    const [customers, setCustomers] = useStickyState('salon_customers', []);
+    const [transactions, setTransactions] = useStickyState('salon_transactions', []);
+    const [inventoryLogs, setInventoryLogs] = useStickyState('salon_inventory_logs', []);
+    const [expenses, setExpenses] = useStickyState('salon_expenses', []);
+    const [pendingOrders, setPendingOrders] = useStickyState('salon_pending_orders', []);
+   const [settings, setSettings] = useStickyState('salon_settings', {
+        categories: DEFAULT_CATEGORIES,
+        expenseTypes: DEFAULT_EXPENSE_TYPES,
+        commissionRates: DEFAULT_COMMISSION,
+        deductCostBeforeCommission: true,
+        autoBackup: false,
+        categoryColors: {},
+        roleColors: {},
+        genderColors: DEFAULT_GENDER_COLORS
+    });
+
+    // --- 自動監控：當單據、客資、人員變動時，延遲 3 秒自動備份 ---
+    React.useEffect(() => {
+        if (transactions.length === 0 && customers.length === 0) return;
+
+        const timer = setTimeout(() => {
+            console.log("偵測到變動，準備自動雲端備份...");
+            syncToCloud();
+        }, 3000); 
+
+        return () => clearTimeout(timer); 
+    }, [transactions, customers, stylists, expenses]);
+    // 1. 雲端抓取功能：確保能把雲端的大庫房抓回來合併
+    const syncFromCloud = async () => {
+        setIsSyncing(true);
+        try {
+            const response = await fetch(GAS_URL);
+            const cloudData = await response.json();
+            if (cloudData && cloudData.services) {
+                
+                // --- 這裡是最關鍵的補強：把雲端的人員名單接住 ---
+                if (cloudData.stylists) {
+                    setStylists(cloudData.stylists);
+                    localStorage.setItem('salon_stylists', JSON.stringify(cloudData.stylists));
+                }
+                // ------------------------------------------
+
+                // 同步其他資料
+                setServices(cloudData.services);
+                setCustomers(cloudData.customers || []);
+                setTransactions(cloudData.transactions || []);
+                setSettings(cloudData.settings || {});
+                setInventoryLogs(cloudData.inventoryLogs || []);
+                setExpenses(cloudData.expenses || []);
+
+                // 同步至本地硬碟存檔
+                localStorage.setItem('salon_services', JSON.stringify(cloudData.services));
+                localStorage.setItem('salon_customers', JSON.stringify(cloudData.customers || []));
+                localStorage.setItem('salon_transactions', JSON.stringify(cloudData.transactions || []));
+                localStorage.setItem('salon_settings', JSON.stringify(cloudData.settings || {}));
+                localStorage.setItem('salon_inventory_logs', JSON.stringify(cloudData.inventoryLogs || []));
+                localStorage.setItem('salon_expenses', JSON.stringify(cloudData.expenses || []));
+
+                showToast("✅ 雲端資料已成功鎖定至此裝置");
+            }
+        } catch (e) { 
+            showToast("連線失敗", "error"); 
+        } finally { 
+            setIsSyncing(false); 
+        }
+    };
+
+    // 2. 雲端備份功能：把本機所有東西（含恢復的舊單）推上去
+ const syncToCloud = async () => {
+        if (isSyncing) return;
+        
+        // --- 1. 改良防呆攔截：不再死鎖，允許刪除到剩下 0 筆時也能同步 ---
+        if (transactions.length === 0 && customers.length === 0) {
+            if (!confirm('偵測到目前無任何單據與客戶，確定要清空雲端資料嗎？')) {
+                return;
+            }
+        }
+
+        setIsSyncing(true);
+
+        // --- 2. 核心封裝：確保「人員名單 (stylists)」與「最新時間 (lastUpdated)」都有包進去 ---
+        const allData = { 
+            services, 
+            stylists,      // 👈 補強：確保人員名字會跟著走
+            customers, 
+            transactions, 
+            settings, 
+            inventoryLogs, 
+            expenses,
+            lastUpdated: new Date().getTime() // 👈 重要：有了這個，刪除動作才會生效
+        };
+
+        try {
+            // --- 3. 發送請求 ---
+            const response = await fetch(GAS_URL, { 
+                method: 'POST', 
+                body: JSON.stringify(allData) 
+            });
+
+            if (response.ok) {
+                showToast("☁️ 雲端同步成功 (含人員與刪除紀錄)");
+            } else {
+                showToast("同步失敗：雲端無回應", "error");
+            }
+        } catch (e) {
+            showToast("同步失敗：連線異常", "error");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+            // Fallback for missing settings if loading from old data
+            const safeSettings = {
+                categories: settings.categories || DEFAULT_CATEGORIES,
+                expenseTypes: settings.expenseTypes || DEFAULT_EXPENSE_TYPES,
+                commissionRates: settings.commissionRates || DEFAULT_COMMISSION,
+                deductCostBeforeCommission: settings.deductCostBeforeCommission ?? true,
+                autoBackup: settings.autoBackup ?? false,
+                categoryColors: settings.categoryColors || {},
+                roleColors: settings.roleColors || {},
+                genderColors: settings.genderColors || DEFAULT_GENDER_COLORS
+            };
+
+            // Global Safe Data Accessors (Data Guards)
+            const safeServices = Array.isArray(services) ? services : [];
+            const safeStylists = Array.isArray(stylists) ? stylists : [];
+            const safeCustomers = Array.isArray(customers) ? customers : [];
+            const safeTransactions = Array.isArray(transactions) ? transactions : [];
+            const safeInventoryLogs = Array.isArray(inventoryLogs) ? inventoryLogs : [];
+            const safeExpenses = Array.isArray(expenses) ? expenses : [];
+            const safePendingOrders = Array.isArray(pendingOrders) ? pendingOrders : [];
+
+            const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+            const confirmAction = (title, message, action) => {
+                setConfirmDialog({ isOpen: true, title, message, onConfirm: async () => { await action(); setConfirmDialog(prev => ({ ...prev, isOpen: false })); }, onCancel: () => setConfirmDialog(prev => ({ ...prev, isOpen: false })) });
+            };
+
+            const showToast = (msg, type = 'success') => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            // Helper to get color classes based on settings
+            const getThemeClasses = (key, type) => {
+                const themeKey = key || 'slate'; // default
+                const theme = COLOR_THEMES[themeKey] || COLOR_THEMES['slate'];
+                if (type === 'card') return `${theme.bg} ${theme.border} ${theme.hover}`;
+                if (type === 'card_filled') return `${theme.card_filled}`;
+                if (type === 'badge') return theme.badge;
+                if (type === 'accent') return `${theme.accent} bg-white`;
+                if (type === 'fill') return theme.fill; // for charts
+                return '';
+            };
+
+            // --- Views ---
+
+            // [查單管理系統] (v18.0)
+            const OrderView = () => {
+                const [searchTerm, setSearchTerm] = useState('');
+                const [dateMode, setDateMode] = useState('month');
+                const [queryDate, setQueryDate] = useState(getCurrentDateLocal().slice(0, 7));
+                const [editingOrder, setEditingOrder] = useState(null);
+                const [filterStylist, setFilterStylist] = useState('all');
+
+                const handleModeChange = (mode) => {
+                    setDateMode(mode);
+                    if (mode === 'month') {
+                        setQueryDate(getCurrentDateLocal().slice(0, 7));
+                    } else {
+                        setQueryDate(getCurrentDateLocal());
+                    }
+                };
+
+                const filteredOrders = useMemo(() => {
+                    return safeTransactions.filter(t => {
+                        const txDate = t.date ? t.date.substring(0, 10) : '';
+                        let matchDate = true;
+                        if (dateMode === 'month') matchDate = txDate.startsWith(queryDate);
+                        else matchDate = txDate === queryDate;
+
+                        const matchSearch = searchTerm ? ((t.customerName && t.customerName.includes(searchTerm)) || (t.id && t.id.includes(searchTerm))) : true;
+                        const matchStylist = filterStylist === 'all' || t.mainStylistId === filterStylist;
+
+                        return matchDate && matchSearch && matchStylist;
+                    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+                }, [safeTransactions, queryDate, searchTerm, dateMode, filterStylist]);
+
+             const handleDeleteOrder = (orderId) => {
+        confirmAction('刪除訂單', '確定要刪除此筆訂單？此動作將同步至雲端。', async () => {
+            // 1. 先從本地陣列中移除
+            const updatedTransactions = transactions.filter(t => t.id !== orderId);
+            
+            // 2. 更新顧客累計資料 (這部分維持你原本的邏輯)
+            const order = transactions.find(t => t.id === orderId);
+            if (order && order.customerId) {
+                const updatedCustomers = customers.map(c => {
+                    if (c.id === order.customerId) {
+                        return { 
+                            ...c, 
+                            visits: Math.max(0, (c.visits || 1) - 1), 
+                            totalSpend: Math.max(0, (c.totalSpend || order.total) - order.total) 
+                        };
+                    }
+                    return c;
+                });
+                setCustomers(updatedCustomers);
+            }
+
+            // 3. 【關鍵：更新本地狀態】
+            setTransactions(updatedTransactions);
+            
+            // 4. 【核心補強：強迫同步】
+            // 這裡不呼叫 syncToCloud()，因為它有防呆攔截，我們直接手動發送 POST
+            showToast("正在同步刪除動作...");
+            const allData = { 
+                services, stylists, 
+                customers: customers, // 這裡要小心，如果是剛更新的要拿最新變數
+                transactions: updatedTransactions, // 傳送已經刪除後的陣列
+                settings, inventoryLogs, expenses,
+                lastUpdated: new Date().getTime() 
+            };
+
+            try {
+                const response = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(allData) });
+                if (response.ok) showToast("☁️ 雲端已同步刪除");
+            } catch (e) {
+                showToast("刪除同步失敗，請手動按備份", "error");
+            }
+        });
+    };
+
+                const handleUpdateOrder = (updatedOrder) => {
+                    const newTransactions = safeTransactions.map(t => t.id === updatedOrder.id ? updatedOrder : t);
+                    setTransactions(newTransactions);
+
+                    const oldOrder = safeTransactions.find(t => t.id === updatedOrder.id);
+                    if (oldOrder && oldOrder.customerId && oldOrder.total !== updatedOrder.total) {
+                        const diff = updatedOrder.total - oldOrder.total;
+                        const updatedCustomers = safeCustomers.map(c => {
+                            if (c.id === oldOrder.customerId) {
+                                return { ...c, totalSpend: (c.totalSpend || 0) + diff };
+                            }
+                            return c;
+                        });
+                        setCustomers(updatedCustomers);
+                    }
+                    
+                    setEditingOrder(null);
+                    showToast('訂單已修正');
+                };
+
+                // Edit Modal Inner Component
+                const EditOrderModal = ({ order, onClose, onSave }) => {
+                    const [form, setForm] = useState(JSON.parse(JSON.stringify(order))); 
+                    
+                    const updateItem = (idx, field, value) => {
+                        const newItems = [...form.items];
+                        newItems[idx][field] = value;
+                        const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
+                        setForm({ ...form, items: newItems, total: newTotal });
+                    };
+
+                    const deleteItem = (idx) => {
+                        const newItems = form.items.filter((_, i) => i !== idx);
+                        const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
+                        setForm({ ...form, items: newItems, total: newTotal });
+                    };
+
+                    const handleConvertToMember = () => {
+                        const inputName = prompt('請輸入新會員姓名：', form.customerName || '');
+                        if (!inputName) return;
+                        const inputPhone = prompt(`請輸入 ${inputName} 的電話號碼：`);
+                        if (!inputPhone) return;
+
+                        const newId = generateId();
+                        const newCustomer = {
+                            id: newId, name: inputName, phone: inputPhone,
+                            notes: '由查單介面轉入', visits: 1, totalSpend: form.total, tags: []
+                        };
+                        
+                        setCustomers([...safeCustomers, newCustomer]);
+                        setForm({ ...form, customerId: newId, customerName: inputName });
+                        showToast(`已成功建立會員：${newCustomer.name}`);
+                    };
+
+                    return (
+                        <Modal title={`編輯訂單 #${order.id.slice(0,8)}`} onClose={onClose} size="max-w-2xl">
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border">
+                                    <div><label className="text-xs font-bold text-slate-500">日期</label><input type="datetime-local" className="input-field" value={form.date.slice(0,16)} onChange={e=>setForm({...form, date: new Date(e.target.value).toISOString()})}/></div>
+                                    <div><label className="text-xs font-bold text-slate-500">付款方式</label><select className="input-field" value={form.paymentMethod} onChange={e=>setForm({...form, paymentMethod: e.target.value})}>{['現金', '信用卡', '街口支付', 'LINE Pay'].map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+                                    <div><label className="text-xs font-bold text-slate-500">主設計師</label><select className="input-field" value={form.mainStylistId} onChange={e=>setForm({...form, mainStylistId: e.target.value})}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                                    <div>
+                                        <div className="flex justify-between items-end mb-1">
+                                            <label className="text-xs font-bold text-slate-500">顧客姓名 {form.customerId ? '(會員)' : '(散客)'}</label>
+                                            {!form.customerId && (<button onClick={handleConvertToMember} className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700 transition-colors flex items-center gap-1"><UserPlus size={10}/> 轉為會員</button>)}
+                                        </div>
+                                        <input type="text" className={`input-field ${form.customerId ? 'bg-indigo-50 text-indigo-700 font-bold opacity-70 cursor-not-allowed' : ''}`} value={form.customerName || ''} onChange={e => setForm({...form, customerName: e.target.value})} disabled={!!form.customerId} placeholder="輸入散客姓名"/>
+                                    </div>
+                                </div>
+                                <div className="border-t pt-4">
+                                    <h4 className="font-bold mb-2">訂單項目</h4>
+                                    <div className="space-y-2">
+                                        {form.items.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-slate-50">
+                                                <div className="flex-1"><div className="font-bold text-sm">{item.name}</div><div className="text-xs text-slate-500">{item.category}</div></div>
+                                                <div className="w-24"><label className="text-[10px] block text-slate-400">售價</label><input type="number" className="input-field py-1 px-2 text-sm" value={item.price} onChange={e=>updateItem(idx, 'price', Number(e.target.value))}/></div>
+                                                <div className="w-20"><label className="text-[10px] block text-slate-400">折扣</label><input type="number" className="input-field py-1 px-2 text-sm text-red-500" value={item.discount||0} onChange={e=>updateItem(idx, 'discount', Number(e.target.value))}/></div>
+                                                <button onClick={()=>deleteItem(idx)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="border-t pt-4 flex justify-between items-center"><div className="text-xl font-black text-slate-800">總計: {formatCurrency(form.total)}</div><div className="flex gap-2"><button onClick={onClose} className="btn btn-secondary">取消</button><button onClick={()=>onSave(form)} className="btn btn-primary">儲存修正</button></div></div>
+                            </div>
+                        </Modal>
+                    );
+                };
+
+                return (
+                    <div className="p-6 h-full overflow-y-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ClipboardList className="text-indigo-500"/> 查單管理系統</h2>
+                            
+                            <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
+                                <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-300">
+                                    <button onClick={() => handleModeChange('month')} className={`px-3 py-1 text-sm rounded-md transition-colors ${dateMode==='month' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>月</button>
+                                    <button onClick={() => handleModeChange('date')} className={`px-3 py-1 text-sm rounded-md transition-colors ${dateMode==='date' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>日</button>
+                                </div>
+                                <input type={dateMode} className="input-field w-auto font-bold" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>
+                                <select className="input-field w-32 font-bold" value={filterStylist} onChange={(e) => setFilterStylist(e.target.value)}>
+                                    <option value="all">全體人員</option>
+                                    {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                                </select>
+                                <div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input className="input-field pl-10" placeholder="搜尋..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>
+                            </div>
+                        </div>
+
+                        {/* 卡片式列表區域 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                            {filteredOrders.map(t => {
+                                const customer = safeCustomers.find(c => c.id === t.customerId);
+                                const gender = customer?.gender || '女'; 
+                                const isVip = (customer?.totalSpend || 0) > 10000;
+
+                                // 讀取自訂顏色
+                                const themeKey = safeSettings.genderColors[gender] || 'slate';
+                                const cardClass = getThemeClasses(themeKey, 'card_filled');
+
+                                return (
+                                    <div key={t.id} className={`card p-5 relative group transition-all border border-transparent hover:border-slate-300 ${cardClass}`}>
+                                        {/* 卡片標頭 */}
+                                        <div className="flex justify-between items-start mb-3 border-b border-black/5 pb-2">
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-800">{new Date(t.date).toLocaleDateString()}</div>
+                                                <div className="text-xs text-slate-500 font-mono">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-xs text-slate-400 font-mono">#{t.id.slice(0,6)}</div>
+                                                {isVip && <span className="text-sm" title="VIP客戶">👑</span>}
+                                            </div>
+                                        </div>
+
+                                        {/* 卡片主體 */}
+                                        <div className="flex justify-between items-center mb-3">
+                                            <div>
+                                                <div className="font-black text-lg text-slate-900 flex items-center gap-1">
+                                                    {t.customerName}
+                                                    <span className="text-[10px] bg-white/50 px-1.5 rounded text-slate-600 border border-slate-200">{gender}</span>
+                                                </div>
+                                                <div className="text-xs text-slate-600 flex items-center gap-1">
+                                                    <User size={10}/> {safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未指定'}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-black text-xl text-slate-800">{formatCurrency(t.total)}</div>
+                                                <span className="text-[10px] bg-white/80 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{t.paymentMethod}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* 服務標籤 (套用分類顏色) */}
+                                        <div className="flex flex-wrap gap-1 mb-1">
+                                            {(t.items||[]).map((i, idx) => {
+                                                const catThemeKey = safeSettings.categoryColors[i.category] || 'slate';
+                                                const catBadgeClass = getThemeClasses(catThemeKey, 'badge');
+                                                return (
+                                                    <span key={idx} className={`text-[10px] px-2 py-1 rounded font-bold border border-black/5 ${catBadgeClass}`}>
+                                                        {i.name}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* 懸浮按鈕 */}
+                                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1.5 rounded-lg shadow-sm backdrop-blur-sm border border-slate-100">
+                                            <button onClick={()=>setEditingOrder(t)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="編輯"><Edit size={16}/></button>
+                                            <button onClick={()=>handleDeleteOrder(t.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="刪除"><Trash2 size={16}/></button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        {filteredOrders.length === 0 && (
+                            <div className="text-center py-20 bg-white rounded-xl border border-dashed text-slate-400 flex flex-col items-center gap-2">
+                                <ClipboardList size={40} className="opacity-20"/>
+                                <span>查無訂單資料</span>
+                            </div>
+                        )}
+
+                        {editingOrder && <EditOrderModal order={editingOrder} onClose={()=>setEditingOrder(null)} onSave={handleUpdateOrder}/>}
+                    </div>
+                );
+            };
+
+            // --- Report View ---
+            const ReportView = () => {
+                const [view, setView] = useState('dashboard');
+                const [reportMode, setReportMode] = useState('month'); 
+                const [queryDate, setQueryDate] = useState(getCurrentDateLocal().slice(0, 7)); // Default YYYY-MM
+                const [newExpense, setNewExpense] = useState({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
+                const [showExpenseModal, setShowExpenseModal] = useState(false);
+
+                const handleModeChange = (mode) => {
+                    setReportMode(mode);
+                    const now = getCurrentDateLocal();
+                    if (mode === 'day') setQueryDate(now);
+                    else if (mode === 'month') setQueryDate(now.slice(0, 7));
+                    else if (mode === 'year') setQueryDate(now.slice(0, 4));
+                };
+
+                const reportTx = useMemo(() => {
+                    return safeTransactions.filter(t => {
+                        if (!t.date) return false;
+                        const d = t.date;
+                        if (reportMode === 'day') return d.startsWith(queryDate);
+                        if (reportMode === 'month') return d.startsWith(queryDate);
+                        if (reportMode === 'year') return d.startsWith(queryDate);
+                        return false;
+                    });
+                }, [safeTransactions, queryDate, reportMode]);
+
+                const reportExp = useMemo(() => {
+                    return safeExpenses.filter(e => {
+                        if (!e.date) return false;
+                        if (reportMode === 'day') return e.date === queryDate;
+                        if (reportMode === 'month') return e.date.startsWith(queryDate);
+                        if (reportMode === 'year') return e.date.startsWith(queryDate);
+                        return false;
+                    });
+                }, [safeExpenses, queryDate, reportMode]);
+
+                const totalRevenue = reportTx.reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+                const totalExpense = reportExp.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                const netProfit = totalRevenue - totalExpense;
+                const totalOrders = reportTx.length;
+                const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+
+                const paymentMethodStats = useMemo(() => {
+                    const stats = {};
+                    reportTx.forEach(t => {
+                        const method = t.paymentMethod || '其他';
+                        if (!stats[method]) stats[method] = 0;
+                        stats[method] += t.total;
+                    });
+                    return stats;
+                }, [reportTx]);
+
+                const salaryReport = useMemo(() => {
+                    return safeStylists.map(s => {
+                        let serviceRevenue = 0, productRevenue = 0, serviceCommission = 0, productCommission = 0;
+                        reportTx.forEach(t => {
+                            (t.items || []).forEach(item => {
+                                if (item.stylistId === s.id) {
+                                    const amount = (Number(item.price) || 0) - (Number(item.discount) || 0);
+                                    const cost = Number(item.cost) || 0;
+                                    const base = safeSettings.deductCostBeforeCommission ? (amount - cost) : amount;
+                                    let rate = s.useGlobalCommission ? (safeSettings.commissionRates[item.category] || 0) : (s.commissionRate || 0);
+                                    const comm = Math.round(base * (rate / 100));
+                                    if (item.isProduct) { productRevenue += amount; productCommission += comm; } 
+                                    else { serviceRevenue += amount; serviceCommission += comm; }
+                                }
+                            });
+                        });
+                        const advanceTotal = reportExp.filter(e => e.type === '員工借支' && e.relatedStaffId === s.id).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                        const totalSalary = (Number(s.baseSalary)||0) + (Number(s.positionBonus)||0) + (Number(s.attendanceBonus)||0) + serviceCommission + productCommission - advanceTotal;
+                        return { ...s, serviceRevenue, productRevenue, totalCommission: serviceCommission+productCommission, advanceTotal, totalSalary };
+                    });
+                }, [reportTx, reportExp, safeStylists, safeSettings]);
+
+                const categoryCountReport = useMemo(() => {
+                    return safeStylists.map(s => {
+                        const counts = {};
+                        safeSettings.categories.forEach(c => counts[c] = 0);
+                        let totalCount = 0;
+                        reportTx.forEach(t => {
+                            (t.items || []).forEach(i => {
+                                if (i.stylistId === s.id) {
+                                    if (counts[i.category] !== undefined) { counts[i.category]++; totalCount++; }
+                                }
+                            });
+                        });
+                        return { ...s, counts, totalCount };
+                    });
+                }, [reportTx, safeStylists, safeSettings]);
+
+                const addExpense = () => {
+                    if(!newExpense.amount) return;
+                    setExpenses([...safeExpenses, { id: generateId(), ...newExpense }]);
+                    setShowExpenseModal(false); setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
+                    showToast('支出已記錄');
+                };
+
+                return (
+                    <div className="p-4 md:p-8 h-full overflow-y-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                            <div className="flex bg-white p-1.5 rounded-xl shadow-sm border border-slate-200">
+                                {[{id:'dashboard', icon:Activity, label:'營運儀表'}, {id:'salary', icon:User, label:'人員薪資'}, {id:'expense', icon:DollarSign, label:'支出管理'}].map(tab => (
+                                    <button key={tab.id} onClick={()=>setView(tab.id)} className={`px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all ${view===tab.id ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                        <tab.icon size={18}/> {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                                <div className="flex gap-1 border-r pr-3 mr-2">
+                                    <button onClick={()=>handleModeChange('day')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='day'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>日報</button>
+                                    <button onClick={()=>handleModeChange('month')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='month'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>月報</button>
+                                    <button onClick={()=>handleModeChange('year')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='year'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>年報</button>
+                                </div>
+                                <span className="text-slate-400 font-bold text-sm">查詢時間</span>
+                                {reportMode === 'day' && <input type="date" className="bg-transparent font-bold text-slate-700 outline-none w-32" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
+                                {reportMode === 'month' && <input type="month" className="bg-transparent font-bold text-slate-700 outline-none" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
+                                {reportMode === 'year' && <input type="number" min="2020" max="2050" className="bg-transparent font-bold text-slate-700 outline-none w-20" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
+                            </div>
+                        </div>
+
+                        {view === 'dashboard' && (
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <StatCard title={`${reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}總營收`} value={formatCurrency(totalRevenue)} icon={TrendingUp} colorClass="border-indigo-500" />
+                                    <StatCard title={`${reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}總支出`} value={formatCurrency(totalExpense)} icon={Wallet} colorClass="border-rose-500" />
+                                    <StatCard title="淨利 (Net Profit)" value={formatCurrency(netProfit)} subValue={`淨利率: ${totalRevenue>0?((netProfit/totalRevenue)*100).toFixed(1):0}%`} icon={DollarSign} colorClass={netProfit>=0?"border-emerald-500":"border-red-500"} />
+                                    <StatCard title="總來客數 (單)" value={totalOrders} subValue={`平均客單: ${formatCurrency(avgOrderValue)}`} icon={User} colorClass="border-amber-500" />
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    <div className="card p-6">
+                                        <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Scissors size={20} className="text-indigo-500"/> 服務項目營收佔比</h3>
+                                        <div className="space-y-5">
+                                            {safeSettings.categories.map(cat => {
+                                                const catTotal = reportTx.reduce((sum, t) => sum + (t.items||[]).filter(i=>i.category===cat).reduce((s,i)=>s+(i.price-(i.discount||0)),0), 0);
+                                                const percent = totalRevenue > 0 ? (catTotal / totalRevenue) * 100 : 0;
+                                                if (percent === 0) return null;
+                                                
+                                                // 使用自訂顏色
+                                                const themeKey = safeSettings.categoryColors[cat] || 'slate';
+                                                const fillColor = getThemeClasses(themeKey, 'fill') || '#6366f1';
+
+                                                return (<div key={cat}><div className="flex justify-between text-sm mb-2 font-bold text-slate-600"><span>{cat}</span><span>{formatCurrency(catTotal)} ({percent.toFixed(1)}%)</span></div><div className="bar-container"><div className="bar-fill" style={{width: `${percent}%`, backgroundColor: fillColor}}></div></div></div>);
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className="card p-6">
+                                        <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><CreditCard size={20} className="text-emerald-500"/> 收款方式分析</h3>
+                                        <div className="space-y-5">
+                                            {Object.entries(paymentMethodStats).map(([method, amount]) => {
+                                                const percent = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0;
+                                                return (<div key={method}><div className="flex justify-between text-sm mb-2 font-bold text-slate-600"><span className="flex items-center gap-2">{method}</span><span>{formatCurrency(amount)} ({percent.toFixed(1)}%)</span></div><div className="bar-container"><div className="bar-fill bg-emerald-500" style={{width: `${percent}%`}}></div></div></div>);
+                                            })}
+                                            {Object.keys(paymentMethodStats).length === 0 && <div className="text-center text-slate-400 py-10">尚無收款紀錄</div>}
+                                        </div>
+                                    </div>
+                                    <div className="card p-6">
+                                        <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Briefcase size={20} className="text-rose-500"/> 支出結構分析</h3>
+                                        <div className="space-y-5">
+                                            {safeSettings.expenseTypes.map(type => {
+                                                const typeTotal = reportExp.filter(e => e.type === type).reduce((sum, e) => sum + (Number(e.amount)||0), 0);
+                                                const percent = totalExpense > 0 ? (typeTotal / totalExpense) * 100 : 0;
+                                                if (typeTotal === 0) return null;
+                                                return (<div key={type}><div className="flex justify-between text-sm mb-2 font-bold text-slate-600"><span>{type}</span><span>{formatCurrency(typeTotal)} ({percent.toFixed(1)}%)</span></div><div className="bar-container"><div className="bar-fill bg-rose-500" style={{width: `${percent}%`}}></div></div></div>);
+                                            })}
+                                            {reportExp.length === 0 && <div className="text-center text-slate-400 py-10">尚無支出紀錄</div>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'salary' && (
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="card overflow-hidden">
+                                    <div className="p-4 border-b bg-slate-50 font-bold text-slate-700">薪資結算表 ({reportMode==='year'?'年度':reportMode==='month'?'月度':'當日'})</div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                                                <tr><th className="p-5 sticky left-0 bg-white">設計師</th><th className="p-5 text-right">技術業績</th><th className="p-5 text-right">販賣業績</th><th className="p-5 text-right text-indigo-600">抽成總額</th><th className="p-5 text-right">底薪+津貼</th><th className="p-5 text-right text-rose-500">借支扣款</th><th className="p-5 text-right font-black bg-indigo-50/50">實領薪資</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {salaryReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-5 font-bold text-slate-800 sticky left-0 bg-white">{s.name} <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-2">{s.role}</span></td><td className="p-5 text-right text-slate-600">{formatCurrency(s.serviceRevenue)}</td><td className="p-5 text-right text-slate-600">{formatCurrency(s.productRevenue)}</td><td className="p-5 text-right font-bold text-indigo-600">{formatCurrency(s.totalCommission)}</td><td className="p-5 text-right text-slate-600">{formatCurrency((s.baseSalary||0) + (s.bonuses||0))}</td><td className="p-5 text-right text-rose-500 font-bold">-{formatCurrency(s.advanceTotal)}</td><td className="p-5 text-right font-black text-lg bg-indigo-50/30 text-slate-800">{formatCurrency(s.totalSalary)}</td></tr>))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 text-xs text-slate-500 text-center border-t">* 薪資計算公式: (底薪 + 津貼) + (各類業績 x 抽成比率) - 借支 <br/>* 當前設定: {safeSettings.deductCostBeforeCommission ? '抽成前已扣除商品成本' : '以銷售全額計算抽成'}</div>
+                                </div>
+                                <div className="card overflow-hidden">
+                                    <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 flex items-center gap-2"><Table size={18}/> 設計師服務客次交叉分析</div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                                                <tr><th className="p-4 sticky left-0 bg-white min-w-[120px]">設計師</th>{safeSettings.categories.map(c => <th key={c} className="p-4 text-center">{c}</th>)}<th className="p-4 text-center font-black bg-indigo-50/30">總客次</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {categoryCountReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-bold text-slate-800 sticky left-0 bg-white border-r">{s.name}</td>{safeSettings.categories.map(c => (<td key={c} className="p-4 text-center text-slate-600">{s.counts[c] > 0 ? <span className="bg-slate-100 px-2 py-1 rounded font-bold">{s.counts[c]}</span> : '-'}</td>))}<td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30">{s.totalCount}</td></tr>))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'expense' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
+                                    <div className="font-bold text-slate-500">{reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}支出總計: <span className="text-2xl text-slate-800 ml-2">{formatCurrency(totalExpense)}</span></div>
+                                    <button onClick={()=>setShowExpenseModal(true)} className="btn btn-primary"><Plus size={18}/> 新增支出</button>
+                                </div>
+                                <div className="card overflow-hidden">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-50 border-b"><tr><th className="p-4">日期</th><th className="p-4">項目</th><th className="p-4">說明</th><th className="p-4 text-right">金額</th><th className="p-4 text-center">操作</th></tr></thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {reportExp.map(e => (
+                                                <tr key={e.id} className="hover:bg-slate-50">
+                                                    <td className="p-4 text-slate-500 font-mono">{e.date}</td>
+                                                    <td className="p-4 font-bold text-slate-700"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${e.type==='員工借支'?'bg-rose-100 text-rose-700':'bg-slate-100 text-slate-700'}`}>{e.type==='員工借支' && <Wallet size={12}/>} {e.type}</span></td>
+                                                    <td className="p-4 text-slate-600">{e.note} {e.relatedStaffId && <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-xs font-bold ml-1">{safeStylists.find(s=>s.id===e.relatedStaffId)?.name}</span>}</td>
+                                                    <td className="p-4 text-right font-bold text-rose-600">{formatCurrency(e.amount)}</td>
+                                                    <td className="p-4 text-center"><button onClick={()=>confirmAction('刪除支出', '確定刪除此筆紀錄？', ()=>setExpenses(safeExpenses.filter(x=>x.id!==e.id)))} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><Trash2 size={16}/></button></td>
+                                                </tr>
+                                            ))}
+                                            {reportExp.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-400">尚無支出紀錄</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {showExpenseModal && (
+                            <Modal title="新增支出紀錄" onClose={()=>setShowExpenseModal(false)}>
+                                <div className="space-y-4">
+                                    <input type="date" className="input-field" value={newExpense.date} onChange={e=>setNewExpense({...newExpense, date: e.target.value})}/>
+                                    <div><label className="text-xs font-bold text-slate-500 mb-2 block">支出類別</label><div className="grid grid-cols-2 gap-2">{safeSettings.expenseTypes.map(t=>(<button key={t} onClick={()=>setNewExpense({...newExpense, type:t, staffId: t!=='員工借支'?'':newExpense.staffId})} className={`py-2.5 rounded-lg text-sm font-bold border transition-all ${newExpense.type===t?'bg-rose-500 text-white border-rose-500 shadow-md':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{t}</button>))}</div></div>
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">金額</label><input type="number" className="input-field text-lg font-bold" placeholder="0" value={newExpense.amount} onChange={e=>setNewExpense({...newExpense, amount: e.target.value})}/></div>
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">備註說明</label><input className="input-field" placeholder="例如: 購買飲料、預支薪水..." value={newExpense.note} onChange={e=>setNewExpense({...newExpense, note: e.target.value})}/></div>
+                                    {newExpense.type === '員工借支' && (<div className="bg-rose-50 p-3 rounded-lg border border-rose-100"><label className="text-xs font-bold text-rose-600 mb-1 block flex items-center gap-1"><User size={12}/> 借支人員 (將從薪資扣除)</label><select className="input-field border-rose-200 focus:border-rose-500" value={newExpense.staffId} onChange={e=>setNewExpense({...newExpense, staffId: e.target.value})}><option value="">請選擇人員</option>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>)}
+                                    <button onClick={addExpense} className="btn btn-primary w-full py-3 mt-2 shadow-lg">確認新增支出</button>
+                                </div>
+                            </Modal>
+                        )}
+                    </div>
+                );
+            };
+
+            // [Inventory View]
+            const InventoryView = () => {
+                const [mode, setMode] = useState('list');
+                const [targetItem, setTargetItem] = useState(null);
+                const [qty, setQty] = useState(1);
+                const [cost, setCost] = useState(0);
+                const [note, setNote] = useState('');
+                const [adjustType, setAdjustType] = useState('inc');
+                const [searchTerm, setSearchTerm] = useState(''); // 新增搜尋功能
+
+                // 過濾商品 (只顯示產品類，並支援搜尋)
+                const products = safeServices.filter(s => 
+                    s.isProduct && (s.name.includes(searchTerm) || s.category.includes(searchTerm))
+                );
+                
+                const handleInventoryAction = (actionType) => {
+                    if(!targetItem || qty <= 0) return;
+                    let newStock = targetItem.stock || 0;
+                    let logType = '', finalNote = note;
+
+                    if (actionType === 'restock') {
+                        newStock += Number(qty); logType = '進貨';
+                        setServices(safeServices.map(s => s.id === targetItem.id ? { ...s, stock: newStock, cost: Number(cost) > 0 ? Number(cost) : s.cost } : s));
+                    } else if (actionType === 'internal') {
+                        if(newStock < qty) { showToast('庫存不足', 'error'); return; }
+                        newStock -= Number(qty); logType = '領用';
+                        setServices(safeServices.map(s => s.id === targetItem.id ? { ...s, stock: newStock } : s));
+                        setExpenses([...safeExpenses, { id: generateId(), date: new Date().toISOString(), type: '自領料(成本)', amount: targetItem.cost * qty, note: `領用: ${targetItem.name} x${qty}`, relatedStaffId: '' }]);
+                    } else if (actionType === 'adjust') {
+                        if (adjustType === 'inc') { newStock += Number(qty); logType = '盤點+'; } 
+                        else { if(newStock < qty) { showToast('庫存不足', 'error'); return; } newStock -= Number(qty); logType = '盤點-'; }
+                        setServices(safeServices.map(s => s.id === targetItem.id ? { ...s, stock: newStock } : s));
+                        if (!finalNote) finalNote = adjustType === 'inc' ? '庫存修正(增)' : '庫存修正(減)';
+                    }
+                    setInventoryLogs([{ id: generateId(), date: new Date().toISOString(), type: logType, itemName: targetItem.name, qty: Number(qty), cost: actionType === 'restock' ? Number(cost) : 0, note: finalNote, operator: 'System' }, ...safeInventoryLogs]);
+                    setTargetItem(null); setQty(1); setCost(0); setNote(''); showToast(`${logType}完成`);
+                };
+
+                return (
+                    <div className="p-6 h-full overflow-y-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <div className="flex gap-4">
+                                <button onClick={()=>setMode('list')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${mode==='list'?'bg-slate-800 text-white shadow-lg':'bg-white text-slate-600'}`}><Box size={18}/> 庫存總覽</button>
+                                <button onClick={()=>setMode('logs')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${mode==='logs'?'bg-slate-800 text-white shadow-lg':'bg-white text-slate-600'}`}><Table size={18}/> 異動紀錄</button>
+                            </div>
+                            {/* 庫存頁面專用的搜尋框 */}
+                            {mode === 'list' && (
+                                <div className="relative w-full md:w-64">
+                                    <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                                    <input className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 卡片模式 (v18.0: 使用分類顏色標籤) */}
+                        {mode === 'list' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                                {products.map(p => {
+                                    const isLowStock = p.stock <= 5; 
+                                    const themeKey = safeSettings.categoryColors[p.category] || 'slate';
+                                    const badgeClass = getThemeClasses(themeKey, 'badge');
+
+                                    return (
+                                        <div key={p.id} className={`card p-5 relative group border-l-4 transition-all ${isLowStock ? 'border-l-red-500 bg-red-50/30' : 'border-l-emerald-500 hover:border-l-emerald-600'}`}>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold mb-1 inline-block ${badgeClass}`}>{p.category}</span>
+                                                    <h3 className="font-bold text-lg text-slate-800">{p.name}</h3>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className={`text-2xl font-black ${isLowStock ? 'text-red-600' : 'text-emerald-600'}`}>{p.stock}</div>
+                                                    <div className="text-[10px] text-slate-400">庫存數量</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex justify-between items-center text-sm text-slate-500 mb-4 bg-white/50 p-2 rounded-lg">
+                                                <span>成本單價:</span>
+                                                <span className="font-mono font-bold">${p.cost}</span>
+                                            </div>
+
+                                            {/* 操作按鈕區 */}
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <button onClick={()=>{setTargetItem(p); setMode('restock'); setCost(p.cost);}} className="flex flex-col items-center justify-center py-2 rounded-lg bg-white border border-emerald-100 hover:bg-emerald-50 text-emerald-600 transition-colors">
+                                                    <Truck size={16} className="mb-1"/>
+                                                    <span className="text-[10px] font-bold">進貨</span>
+                                                </button>
+                                                <button onClick={()=>{setTargetItem(p); setMode('internal');}} className="flex flex-col items-center justify-center py-2 rounded-lg bg-white border border-orange-100 hover:bg-orange-50 text-orange-600 transition-colors">
+                                                    <Hand size={16} className="mb-1"/>
+                                                    <span className="text-[10px] font-bold">領用</span>
+                                                </button>
+                                                <button onClick={()=>{setTargetItem(p); setMode('adjust'); setAdjustType('inc');}} className="flex flex-col items-center justify-center py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors">
+                                                    <RefreshCw size={16} className="mb-1"/>
+                                                    <span className="text-[10px] font-bold">盤點</span>
+                                                </button>
+                                            </div>
+
+                                            {isLowStock && (
+                                                <div className="absolute top-2 right-2 flex h-3 w-3">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {products.length === 0 && (
+                                    <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed text-slate-400 flex flex-col items-center gap-2">
+                                        <Box size={40} className="opacity-20"/>
+                                        <p>尚無相關商品，請至「設定」新增或檢查搜尋條件</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 紀錄模式 (維持表格，但優化樣式) */}
+                        {mode === 'logs' && (
+                            <div className="card overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-50 border-b"><tr><th className="p-4">時間</th><th className="p-4">類型</th><th className="p-4">品項</th><th className="p-4 text-right">數量</th><th className="p-4">備註</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {safeInventoryLogs.map(l => (
+                                            <tr key={l.id} className="hover:bg-slate-50">
+                                                <td className="p-4 text-slate-500">{new Date(l.date).toLocaleString()}</td>
+                                                <td className="p-4">
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold 
+                                                        ${l.type==='進貨'?'bg-emerald-100 text-emerald-700':
+                                                          l.type==='銷售'?'bg-blue-100 text-blue-700':
+                                                          l.type==='領用'?'bg-orange-100 text-orange-700':
+                                                          'bg-slate-200 text-slate-700'}`}>
+                                                        {l.type}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 font-bold">{l.itemName}</td>
+                                                <td className="p-4 text-right">{l.qty}</td>
+                                                <td className="p-4 text-slate-500 text-xs">{l.note}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* 彈出視窗 (共用邏輯不變) */}
+                        {(mode === 'restock' || mode === 'internal' || mode === 'adjust') && targetItem && (
+                            <Modal title={mode==='restock'?'商品進貨 (入庫)': mode==='internal'?'內部領用 (扣庫)' : '庫存盤點 / 調整'} onClose={()=>{setMode('list'); setTargetItem(null);}} size="max-w-sm">
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200"><span className="text-xs text-slate-500 block uppercase tracking-wider font-bold mb-1">Target Item</span><span className="font-bold text-xl text-slate-800">{targetItem.name}</span><div className="text-sm text-slate-500 mt-1">目前庫存: <span className="font-bold text-indigo-600">{targetItem.stock}</span></div></div>
+                                    {mode === 'adjust' && (<div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg"><button onClick={()=>setAdjustType('inc')} className={`py-2 rounded-md text-sm font-bold transition-all ${adjustType==='inc'?'bg-white text-emerald-600 shadow-sm':'text-slate-400 hover:text-slate-600'}`}>+ 增加庫存</button><button onClick={()=>setAdjustType('dec')} className={`py-2 rounded-md text-sm font-bold transition-all ${adjustType==='dec'?'bg-white text-red-500 shadow-sm':'text-slate-400 hover:text-slate-600'}`}>- 減少庫存</button></div>)}
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">調整數量</label><input type="number" className="input-field text-lg" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/></div>
+                                    {mode === 'restock' && <div><label className="text-xs font-bold text-slate-500 mb-1 block">進貨單價 (成本)</label><input type="number" className="input-field" value={cost} onChange={e=>setCost(e.target.value)}/></div>}
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">備註說明</label><input type="text" className="input-field" value={note} onChange={e=>setNote(e.target.value)}/></div>
+                                    <button onClick={()=>handleInventoryAction(mode)} className={`w-full py-3 rounded-xl font-bold text-white shadow-lg mt-2 ${mode==='restock'?'bg-emerald-600 hover:bg-emerald-700':mode==='internal'?'bg-orange-500 hover:bg-orange-600':adjustType==='inc'?'bg-slate-700 hover:bg-slate-800':'bg-red-500 hover:bg-red-600'}`}>確認{mode==='restock'?'進貨': mode==='internal'?'領用' : adjustType==='inc'?'增加':'減少'}</button>
+                                </div>
+                            </Modal>
+                        )}
+                    </div>
+                );
+            };
+
+            // [POS View] (v12.0)
+            const POSView = () => {
+                const [cart, setCart] = useState([]);
+                const [selectedCategory, setSelectedCategory] = useState('全部');
+                // 預設選取第一位設計師
+                const [selectedStylist, setSelectedStylist] = useState(safeStylists[0]?.id || '');
+                const [selectedAssistant, setSelectedAssistant] = useState('');
+                const [selectedCustomer, setSelectedCustomer] = useState(null);
+                const [custSearch, setCustSearch] = useState('');
+                const [adHocCustomerName, setAdHocCustomerName] = useState('');
+                const [adHocGender, setAdHocGender] = useState('女');
+                const [showCheckout, setShowCheckout] = useState(false);
+                const [showPending, setShowPending] = useState(false);
+                const [checkoutDate, setCheckoutDate] = useState(getCurrentDateTimeLocal());
+                const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+                const [editingCartItem, setEditingCartItem] = useState(null);
+
+                // 分類顏色 (v18.0 強化)
+                const getCategoryColor = (cat) => {
+                    const themeKey = safeSettings.categoryColors[cat] || 'slate';
+                    return getThemeClasses(themeKey, 'card');
+                };
+
+                // ★ 新增：當切換「主操作」時，同步更新購物車內所有項目的設計師
+                const handleMainStylistChange = (e) => {
+                    const newStylistId = e.target.value;
+                    setSelectedStylist(newStylistId);
+
+                    const stylistObj = safeStylists.find(s => s.id === newStylistId);
+                    const stylistName = stylistObj ? stylistObj.name : '未指定';
+
+                    // 同步更新購物車
+                    if (cart.length > 0) {
+                        const updatedCart = cart.map(item => ({
+                            ...item,
+                            stylistId: newStylistId,
+                            stylistName: stylistName
+                        }));
+                        setCart(updatedCart);
+                        showToast(`已將所有項目同步為：${stylistName}`);
+                    }
+                };
+
+                const filteredServices = useMemo(() => {
+                    let items = safeServices.filter(s => !s.isInternal);
+                    if (selectedCategory !== '全部') items = items.filter(s => s.category === selectedCategory);
+                    return items;
+                }, [safeServices, selectedCategory]);
+
+                const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price - (item.discount||0)), 0), [cart]);
+
+                const addToCart = (service) => {
+                    if (service.isProduct && service.stock !== null) {
+                        const inCart = cart.filter(i => i.id === service.id).length;
+                        if ((service.stock - inCart) <= 0) { showToast('庫存不足！', 'error'); return; }
+                    }
+                    const stylistObj = safeStylists.find(s => s.id === selectedStylist);
+                    const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
+                    
+                    setCart([...cart, { 
+                        cartId: generateId(), 
+                        id: service.id, 
+                        name: service.name, 
+                        price: service.price, 
+                        cost: service.cost || 0, 
+                        category: service.category, 
+                        stock: service.stock, 
+                        isProduct: service.isProduct, 
+                        // 加入時，直接使用當前選定的主操作人員
+                        stylistId: selectedStylist, 
+                        stylistName: stylistObj?.name || '未指定', 
+                        assistantId: selectedAssistant, 
+                        assistantName: assistantObj?.name || '', 
+                        isDesignated: true, 
+                        discount: 0 
+                    }]);
+                };
+
+                const handlePendingOrder = () => {
+                    if (cart.length === 0) return;
+                    const custName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
+                    const note = prompt('掛單備註 (例如: 染髮等待中)');
+                    if (note === null) return;
+                    setPendingOrders([...safePendingOrders, { id: generateId(), time: new Date().toISOString(), cart, selectedCustomer, adHocCustomerName, note, custName }]);
+                    setCart([]); setSelectedCustomer(null); setAdHocCustomerName(''); showToast('已掛單暫存');
+                };
+
+                const restoreOrder = (order) => {
+                    setCart(order.cart); setSelectedCustomer(order.selectedCustomer); setAdHocCustomerName(order.adHocCustomerName || '');
+                    setPendingOrders(safePendingOrders.filter(o => o.id !== order.id)); setShowPending(false); showToast('單據已取出');
+                };
+
+const handleCheckout = (paymentMethod) => {
+                if (cart.length === 0) return;
+                
+                const finalCustName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
+                const finalCustId = selectedCustomer ? selectedCustomer.id : null;
+                const finalGender = selectedCustomer ? selectedCustomer.gender : adHocGender;
+
+                // 1. 產生新訂單
+                const newOrder = { 
+                    id: generateId(), 
+                    date: new Date(checkoutDate).toISOString(), 
+                    items: cart, 
+                    total: cartTotal, 
+                    paymentMethod, 
+                    mainStylistId: selectedStylist, 
+                    customerId: finalCustId, 
+                    customerName: finalCustName,
+                    customerGender: finalGender,
+                    createdAt: new Date().toISOString() 
+                };
+
+                // 2. 存入交易紀錄
+                setTransactions(prev => [newOrder, ...prev]);
+
+                // 2. 如果是會員，更新他的消費累計 (先算好最新資料)
+                    const updatedCustomers = selectedCustomer ? customers.map(c => 
+                        c.id === selectedCustomer.id ? { ...c, totalSpent: (c.totalSpent || 0) + cartTotal } : c
+                    ) : customers;
+                    const updatedTransactions = [newOrder, ...transactions];
+
+                    setCustomers(updatedCustomers);
+                    setTransactions(updatedTransactions);
+
+                    // 4. 清空購物車與狀態
+                    setCart([]);
+                    setSelectedCustomer(null);
+                    setAdHocCustomerName('');
+                    setShowCheckout(false);
+
+                    // 5. 顯示通知
+                    showToast("✅ 結帳成功！");
+
+                    // --- 🚀 修改這裡：把最新包裹直接遞給它 ---
+                    setTimeout(() => {
+                        if (typeof syncToCloud === 'function') {
+                            syncToCloud({
+                                services, stylists, settings, inventoryLogs, expenses,
+                                transactions: updatedTransactions, // 帶上最新的單
+                                customers: updatedCustomers       // 帶上最新的客資
+                            });
+                        }
+                    }, 1500);
+
+// 1. 更新商品庫存
+        const updatedServices = safeServices.map(s => {
+            const cartItems = cart.filter(i => i.id === s.id);
+            if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
+                return { ...s, stock: Math.max(0, s.stock - cartItems.length) }; 
+            }
+            return s;
+        });
+        setServices(updatedServices);
+        
+        // 2. 記錄庫存異動日誌
+        const newLogs = cart.filter(i=>i.isProduct).map(i=>({ id: generateId(), date: new Date().toISOString(), type: '銷售', itemName: i.name, qty: 1, cost: i.cost, note: `訂單 #${newOrder.id.slice(0,6)}`, operator: 'System' }));
+        setInventoryLogs([...newLogs, ...safeInventoryLogs]);
+
+        // 3. 如果是會員，更新消費累計
+        if (selectedCustomer) {
+            setCustomers(safeCustomers.map(c => c.id === selectedCustomer.id ? { ...c, visits: (c.visits || 0) + 1, totalSpend: (c.totalSpend || 0) + cartTotal } : c));
+        }
+
+        // 4. 存入交易紀錄並重置頁面
+        setTransactions([newOrder, ...safeTransactions]);
+        setCart([]); 
+        setSelectedCustomer(null); 
+        setAdHocCustomerName(''); 
+        setShowCheckout(false); 
+        showToast('結帳成功！');
+        setTimeout(syncToCloud, 1000); // 結帳完 1 秒鐘後自動上傳雲端
+        
+        // 5. 自動備份邏輯
+        if (safeSettings.autoBackup) {
+            setTimeout(() => {
+                try {
+                    const backupData = { services: updatedServices, stylists: safeStylists, customers: safeCustomers, transactions: [newOrder, ...safeTransactions], settings: safeSettings, inventoryLogs: [...newLogs, ...safeInventoryLogs], expenses: safeExpenses };
+                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = "salon_backup_auto.json";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                } catch(e) { console.error(e); }
+            }, 1000);
+        }
+   };
+                return (
+                    <div className="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden relative">
+                        {isAddingCustomer && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl"><h3 className="font-bold text-lg">快速新增顧客</h3><QuickCustomerForm stylists={safeStylists} onSave={(data) => { const newCust = { id: generateId(), ...data, visits: 0, totalSpend: 0, tags: [] }; setCustomers([...safeCustomers, newCust]); setSelectedCustomer(newCust); setIsAddingCustomer(false); }} onCancel={() => setIsAddingCustomer(false)}/></div></div>}
+                        {showPending && (
+                            <Modal title="暫存單據 (掛單)" onClose={()=>setShowPending(false)} size="max-w-lg">
+                                {safePendingOrders.length === 0 ? <p className="text-center text-slate-400 py-4">無暫存單據</p> : safePendingOrders.map(o => (
+                                    <div key={o.id} className="border p-3 rounded-xl flex justify-between items-center bg-slate-50 mb-2">
+                                        <div><div className="font-bold text-slate-800">{o.custName} <span className="text-xs font-normal text-slate-500">({new Date(o.time).toLocaleTimeString()})</span></div><div className="text-sm text-slate-600">{o.note}</div></div>
+                                        <div className="flex gap-2"><button onClick={()=>confirmAction('刪除掛單', '確定？', ()=>setPendingOrders(safePendingOrders.filter(x=>x.id!==o.id)))} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button><button onClick={()=>restoreOrder(o)} className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"><PlayCircle size={18}/> 取單</button></div>
+                                    </div>
+                                ))}
+                            </Modal>
+                        )}
+
+                        <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-4 border-b space-y-3 bg-white">
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">{selectedCustomer ? (<div className="flex justify-between items-center bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg"><span className="font-bold text-rose-700 flex items-center gap-2"><User size={16}/> {selectedCustomer.name}</span><button onClick={()=>setSelectedCustomer(null)}><X size={16} className="text-rose-400"/></button></div>) : (<><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all" placeholder="搜尋會員 (電話/姓名)..." value={custSearch} onChange={e => setCustSearch(e.target.value)}/>{custSearch && (<div className="absolute top-full left-0 w-full bg-white shadow-xl border rounded-lg mt-1 max-h-48 overflow-y-auto z-20">{safeCustomers.filter(c => (c.name||'').includes(custSearch) || (c.phone||'').includes(custSearch)).map(c => (<div key={c.id} onClick={()=>{setSelectedCustomer(c); setCustSearch('');}} className="p-3 hover:bg-slate-50 cursor-pointer border-b text-sm font-bold text-slate-700">{c.name} <span className="font-normal text-slate-400 ml-2">{c.phone}</span></div>))}<button onClick={() => setIsAddingCustomer(true)} className="w-full p-3 text-rose-500 font-bold text-sm hover:bg-rose-50">+ 新增顧客</button></div>)}</>)}</div>
+                                   <div className="flex gap-2">
+    <input className="input-field w-28 py-2.5" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)} disabled={!!selectedCustomer}/>
+    <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
+        <option value="女">女生</option>
+        <option value="男">男生</option>
+        <option value="兒童">兒童</option>
+    </select>
+</div>
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+                                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                                    {filteredServices.map(s => { 
+                                        const inCartCount = cart.filter(i => i.id === s.id).length; 
+                                        const remaining = s.stock !== null ? s.stock - inCartCount : null; 
+                                        const noStock = remaining !== null && remaining <= 0; 
+                                        // v18.0: 使用自訂分類顏色
+                                        const colorClass = getCategoryColor(s.category);
+                                        
+                                        return (
+                                            <button key={s.id} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
+                                                <div className="flex justify-between mb-2">
+                                                    <span className="text-[10px] bg-white/80 px-2 py-0.5 rounded text-slate-500 font-bold backdrop-blur-sm">{s.category}</span>
+                                                    {remaining !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${remaining<=5?'bg-red-100 text-red-500':'bg-emerald-100 text-emerald-600'}`}>存 {remaining}</span>}
+                                                </div>
+                                                <h3 className="font-bold text-slate-800 mb-1 truncate text-lg">{s.name}</h3>
+                                                <div className="text-slate-700 font-black text-lg">{formatCurrency(s.price)}</div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="w-full lg:w-96 bg-white rounded-2xl shadow-xl flex flex-col h-[45vh] lg:h-full border border-slate-200">
+                            <div className="p-4 border-b flex justify-between items-center bg-slate-50/50"><span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span><div className="flex gap-2"><button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button><span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span></div></div>
+                            <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2">{cart.map(item => {
+                                // v18.0: 購物車項目加上分類色條
+                                const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
+                                const itemBorderClass = getThemeClasses(catColorKey, 'accent');
+
+                                return (
+                                <div key={item.cartId} className={`p-3 border border-slate-200 rounded-xl relative group bg-white hover:border-rose-300 transition-all border-l-4 ${itemBorderClass}`}>
+                                    <div className="flex justify-between font-bold text-sm mb-1"><span>{item.name}</span><div className="flex flex-col items-end"><span className={`${item.discount>0?'line-through text-slate-400 text-xs': 'text-rose-600'}`}>{formatCurrency(item.price)}</span>{item.discount > 0 && <span className="text-rose-600">{formatCurrency(item.price - item.discount)}</span>}</div></div><div className="text-xs text-slate-500 flex flex-col gap-0.5"><span className="flex items-center gap-1"><User size={10}/> {item.stylistName} <span className={`ml-1 px-1 rounded ${item.isDesignated ? 'bg-rose-100 text-rose-600':'bg-gray-100 text-gray-500'}`}>{item.isDesignated ? '指定' : '不指定'}</span></span>{item.assistantName && <span className="text-indigo-600">助: {item.assistantName}</span>}{item.discount > 0 && <span className="text-green-600 font-bold">折抵: -{formatCurrency(item.discount)}</span>}</div><div className="absolute right-2 bottom-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => setEditingCartItem(item)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><Edit size={14}/></button><button onClick={() => setCart(cart.filter(c => c.cartId !== item.cartId))} className="p-1.5 hover:bg-red-50 text-red-400 rounded"><Trash2 size={14}/></button></div>
+                                </div>
+                            )})}
+                            {cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}</div>
+                            <div className="p-4 border-t bg-white rounded-b-2xl">
+                                <div className="flex justify-between items-end mb-4"><span className="text-slate-500 font-bold">總計</span><span className="text-3xl font-black text-slate-800">{formatCurrency(cartTotal)}</span></div>
+                                <div className="space-y-3 mb-4">
+                                    <div className="flex items-center gap-2 w-full">
+                                        <span className="text-sm font-bold text-slate-500 w-14 text-right">主操作:</span>
+                                        {/* 修改：onChange 事件改為呼叫新的 handleMainStylistChange */}
+                                        <select className="input-field py-2" value={selectedStylist} onChange={handleMainStylistChange}>
+                                            {safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full">
+                                        <span className="text-sm font-bold text-slate-500 w-14 text-right">協助:</span>
+                                        <select className="input-field py-2" value={selectedAssistant} onChange={e => setSelectedAssistant(e.target.value)}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2"><button onClick={handlePendingOrder} disabled={cart.length === 0} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50">掛單</button><button onClick={() => setShowCheckout(true)} disabled={cart.length === 0} className="flex-[2] btn-primary py-3 rounded-xl font-bold shadow-lg disabled:opacity-50">結帳收款</button></div>
+                            </div>
+                        </div>
+                        
+                        {showCheckout && (
+                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 animate-fade-in shadow-2xl"><h3 className="font-bold text-xl text-center mb-2">確認收款</h3><div className="text-center text-3xl font-black text-rose-500 mb-6">{formatCurrency(cartTotal)}</div><div className="grid grid-cols-1 gap-3">{['現金', '信用卡', '街口支付', 'LINE Pay'].map(m => (<button key={m} onClick={() => handleCheckout(m)} className="w-full p-4 border rounded-xl hover:bg-blue-50 hover:border-blue-500 font-bold text-slate-700 flex items-center justify-center gap-2 transition-all">{m === '現金' && <Banknote size={20}/>}{m === '信用卡' && <CreditCard size={20}/>}{(m.includes('Pay') || m.includes('街口')) && <Smartphone size={20}/>}{m}</button>))}</div><button onClick={() => setShowCheckout(false)} className="w-full py-3 text-slate-400 font-bold">取消</button></div></div>
+                        )}
+
+                        {editingCartItem && (
+                            <Modal title={`編輯: ${editingCartItem.name}`} onClose={()=>setEditingCartItem(null)} size="max-w-sm">
+                                <div className="space-y-4">
+                                    <div className="flex gap-2 items-center bg-slate-50 p-3 rounded-lg border border-slate-200"><input type="checkbox" id="isDesignated" className="w-5 h-5 accent-rose-500" checked={editingCartItem.isDesignated} onChange={e => setEditingCartItem({...editingCartItem, isDesignated: e.target.checked})}/><label htmlFor="isDesignated" className="font-bold text-slate-700">指定設計師</label></div>
+                                    <div className="grid grid-cols-2 gap-3"><div><label className="text-xs text-slate-500 font-bold mb-1 block">售價</label><input type="number" className="input-field" value={editingCartItem.price} onChange={e => setEditingCartItem({...editingCartItem, price: Number(e.target.value)})}/></div><div><label className="text-xs text-slate-500 font-bold mb-1 block">折扣金額</label><input type="number" className="input-field text-red-500" value={editingCartItem.discount} onChange={e => setEditingCartItem({...editingCartItem, discount: Number(e.target.value)})}/></div></div>
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">主操作</label><select className="input-field" value={editingCartItem.stylistId} onChange={e => { const s = safeStylists.find(st => st.id === e.target.value); setEditingCartItem({...editingCartItem, stylistId: s.id, stylistName: s.name}); }}>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">助理</label><select className="input-field" value={editingCartItem.assistantId || ''} onChange={e => { const s = safeStylists.find(st => st.id === e.target.value); setEditingCartItem({...editingCartItem, assistantId: s?.id||'', assistantName: s?.name||''}); }}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                                    <div className="flex gap-3 mt-4"><button onClick={() => { setCart(cart.map(c => c.cartId === editingCartItem.cartId ? editingCartItem : c)); setEditingCartItem(null); }} className="btn btn-primary flex-1">確定</button><button onClick={() => setEditingCartItem(null)} className="btn btn-secondary flex-1">取消</button></div>
+                                </div>
+                            </Modal>
+                        )}
+                    </div>
+                );
+            };
+
+            // [StaffView] (v13.0 修正版：防崩潰 + 必填檢查)
+            const StaffView = () => {
+                const [isEditing, setIsEditing] = useState(false);
+                const [editForm, setEditForm] = useState({});
+
+                const handleSave = () => { 
+                    // 1. 必填檢查
+                    if (!editForm.name || editForm.name.trim() === '') {
+                        alert('請輸入人員姓名！(Name is required)');
+                        return;
+                    }
+
+                    if (editForm.id) {
+                        setStylists(safeStylists.map(s => s.id === editForm.id ? editForm : s)); 
+                    } else {
+                        setStylists([...safeStylists, { ...editForm, id: generateId(), useGlobalCommission: true }]); 
+                    }
+                    setIsEditing(false); 
+                    showToast('人員資料已儲存'); 
+                };
+
+                const deleteStaff = (id) => confirmAction('刪除', '確定要刪除這位人員嗎？', () => setStylists(safeStylists.filter(s => s.id !== id)));
+                
+                return (
+                    <div className="p-6 md:p-10 h-full overflow-y-auto">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="flex justify-between items-center mb-8">
+                                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><UserCog size={28} className="text-indigo-500"/> 人員管理</h2>
+                                <button onClick={()=>{setEditForm({role:'設計師', baseSalary:0, positionBonus:0, attendanceBonus:0, commissionRate:0, useGlobalCommission:true}); setIsEditing(true);}} className="btn btn-primary"><Plus size={18}/> 新增人員</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {safeStylists.map(s => {
+                                    const roleKey = s.role || '設計師';
+                                    const theme = (safeSettings.roleColors && safeSettings.roleColors[roleKey]) 
+                                        ? COLOR_THEMES[safeSettings.roleColors[roleKey]] 
+                                        : COLOR_THEMES['slate'];
+                                    
+                                    const accentClass = theme ? `${theme.accent} bg-white` : 'border-l-slate-300 bg-white';
+                                    const badgeClass = theme ? theme.badge : 'bg-slate-100 text-slate-600';
+                                    
+                                    const displayName = s.name || '未命名';
+                                    const displayInitial = displayName.length > 0 ? displayName.charAt(0) : '?';
+
+                                    return (
+                                        <div key={s.id} className={`card p-6 relative group border-l-4 ${accentClass}`}>
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-xl">
+                                                    {displayInitial}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-xl">{displayName}</h3>
+                                                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${badgeClass}`}>{s.role || '設計師'}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-sm text-slate-500 font-medium">底薪: {formatCurrency(s.baseSalary||0)}</div>
+                                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={()=>{setEditForm(s); setIsEditing(true);}} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><Edit size={18}/></button>
+                                                <button onClick={()=>deleteStaff(s.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18}/></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        {isEditing && (
+                            <Modal title={editForm.id ? '編輯人員' : '新增人員'} onClose={()=>setIsEditing(false)}>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">姓名 (必填)</label><input className="input-field border-l-4 border-l-red-400" placeholder="請輸入姓名" value={editForm.name||''} onChange={e=>setEditForm({...editForm, name: e.target.value})}/></div>
+                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">職位</label><select className="input-field" value={editForm.role||'設計師'} onChange={e=>setEditForm({...editForm, role: e.target.value})}><option value="設計師">設計師</option><option value="助理">助理</option><option value="店長">店長</option></select></div>
+                                    </div>
+                                    <div className="border-t pt-4 mt-2">
+                                        <label className="text-xs font-bold text-slate-500 mb-3 block">薪資結構 (月)</label>
+                                        <div className="grid grid-cols-3 gap-3 mb-2">
+                                            <div><span className="text-xs block mb-1">底薪</span><input type="number" className="input-field" value={editForm.baseSalary||0} onChange={e=>setEditForm({...editForm, baseSalary: Number(e.target.value)})}/></div>
+                                            <div><span className="text-xs block mb-1">職務加給</span><input type="number" className="input-field" value={editForm.positionBonus||0} onChange={e=>setEditForm({...editForm, positionBonus: Number(e.target.value)})}/></div>
+                                            <div><span className="text-xs block mb-1">全勤獎金</span><input type="number" className="input-field" value={editForm.attendanceBonus||0} onChange={e=>setEditForm({...editForm, attendanceBonus: Number(e.target.value)})}/></div>
+                                        </div>
+                                    </div>
+                                    <div className="border-t pt-4">
+                                        <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                                            <input type="checkbox" checked={editForm.useGlobalCommission} onChange={e=>setEditForm({...editForm, useGlobalCommission: e.target.checked})} className="w-4 h-4 accent-indigo-600"/> 
+                                            <span className="text-sm font-bold text-slate-700">使用全店統一抽成設定</span>
+                                        </label>
+                                        {!editForm.useGlobalCommission && (
+                                            <div><span className="text-xs text-slate-500 font-bold mb-1 block">個人抽成率 (%)</span><input type="number" className="input-field" value={editForm.commissionRate||0} onChange={e=>setEditForm({...editForm, commissionRate: Number(e.target.value)})}/></div>
+                                        )}
+                                    </div>
+                                    <button onClick={handleSave} className="btn btn-primary w-full mt-4">儲存人員資料</button>
+                                </div>
+                            </Modal>
+                        )}
+                    </div>
+                );
+            };
+
+            const CustomerView = () => {
+                const [searchTerm, setSearchTerm] = useState('');
+                const [viewingCustomer, setViewingCustomer] = useState(null);
+                const [isEditing, setIsEditing] = useState(false);
+                const [editForm, setEditForm] = useState({});
+                const [filterStylist, setFilterStylist] = useState('all');
+
+                const filtered = safeCustomers.filter(c => {
+                    const matchSearch = (c.name||'').includes(searchTerm) || (c.phone||'').includes(searchTerm);
+                    const matchStylist = filterStylist === 'all' || c.preferredStylistId === filterStylist;
+                    return matchSearch && matchStylist;
+                });
+
+                const handleSave = () => { 
+                    if (editForm.id) {
+                        setCustomers(safeCustomers.map(c => c.id === editForm.id ? editForm : c)); 
+                    } else {
+                        setCustomers([...safeCustomers, { ...editForm, id: generateId(), visits: 0, totalSpend: 0, tags: [] }]); 
+                    }
+                    setIsEditing(false); 
+                    showToast('已儲存'); 
+                };
+
+                const handleDeleteCustomer = (id) => {
+                    confirmAction('刪除顧客', '確定要刪除此顧客資料？', () => {
+                        setCustomers(safeCustomers.filter(c => c.id !== id));
+                        if (viewingCustomer && viewingCustomer.id === id) { setViewingCustomer(null); setIsEditing(false); }
+                        showToast('顧客資料已刪除');
+                    });
+                };
+
+                const getAvatarColor = (name) => {
+                    const colors = ['bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 'bg-amber-100 text-amber-600', 'bg-emerald-100 text-emerald-600', 'bg-teal-100 text-teal-600', 'bg-cyan-100 text-cyan-600', 'bg-blue-100 text-blue-600', 'bg-indigo-100 text-indigo-600', 'bg-violet-100 text-violet-600', 'bg-fuchsia-100 text-fuchsia-600', 'bg-pink-100 text-pink-600', 'bg-rose-100 text-rose-600'];
+                    let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash); return colors[Math.abs(hash) % colors.length];
+                };
+
+                return (
+                    <div className="p-6 md:p-10 h-full overflow-y-auto">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><User size={28} className="text-indigo-500"/> 客戶資料 ({filtered.length})</h2>
+                                <div className="flex gap-2 w-full md:w-auto">
+                                    <select className="input-field w-36 font-bold text-slate-700" value={filterStylist} onChange={(e) => setFilterStylist(e.target.value)}>
+                                        <option value="all">全部設計師</option>
+                                        <option value="">(未指定)</option>
+                                        {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                                    </select>
+                                    <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input className="input-field pl-10 py-2" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>
+                                    <button onClick={()=>{setEditForm({tags:[]}); setIsEditing(true);}} className="btn btn-primary whitespace-nowrap"><UserPlus size={18}/> 新增顧客</button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {filtered.map(c => {
+                                    const isVip = (c.totalSpend || 0) > 10000;
+                                    const stylistName = safeStylists.find(s => s.id === c.preferredStylistId)?.name || '未指定';
+                                    const gender = c.gender || '女';
+                                    const themeKey = safeSettings.genderColors[gender] || 'slate';
+                                    const cardClass = getThemeClasses(themeKey, 'card_filled');
+
+                                    return (
+                                        <div key={c.id} onClick={()=>setViewingCustomer(c)} className={`card p-5 relative group cursor-pointer transition-all border border-transparent hover:border-slate-300 ${cardClass}`}>
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center gap-3"><div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-white text-slate-600`}>{c.name.charAt(0)}</div><div><h3 className="font-bold text-lg text-slate-800 flex items-center gap-1">{c.name}{isVip && <span className="text-sm" title="VIP">👑</span>}</h3><p className="text-sm text-slate-500 font-mono">{c.phone}</p></div></div>
+                                            </div>
+                                            <div className="mb-3"><span className="text-xs bg-white/50 text-slate-600 px-2 py-1 rounded flex items-center gap-1 w-fit border border-slate-200"><UserCog size={12}/> 專屬: <span className="font-bold text-slate-800">{stylistName}</span></span></div>
+                                            <div className="grid grid-cols-2 gap-2 bg-white/40 p-3 rounded-xl border border-slate-200/50 mb-3"><div className="text-center"><div className="text-xs text-slate-500 mb-1">累積消費</div><div className="font-black text-slate-800">{formatCurrency(c.totalSpend || 0)}</div></div><div className="text-center border-l border-slate-300"><div className="text-xs text-slate-500 mb-1">來店次數</div><div className="font-black text-slate-800">{c.visits || 0} 次</div></div></div>
+                                            <div className="text-xs text-slate-500 truncate mb-1"><span className="font-bold text-slate-700">備註:</span> {c.notes || '無'}</div>
+                                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e)=>{e.stopPropagation(); setEditForm(c); setIsEditing(true);}} className="p-1.5 bg-white border shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 hover:border-indigo-200"><Edit size={16}/></button><button onClick={(e)=>{e.stopPropagation(); handleDeleteCustomer(c.id);}} className="p-1.5 bg-white border shadow-sm rounded-lg text-slate-400 hover:text-red-500 hover:border-red-200"><Trash2 size={16}/></button></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {filtered.length === 0 && <div className="text-center text-slate-400 py-20 bg-white rounded-xl border border-dashed">查無相關顧客資料</div>}
+                        </div>
+                        {isEditing && (<Modal title={editForm.id ? '編輯顧客資料' : '新增顧客'} onClose={()=>setIsEditing(false)}><div className="space-y-5"><div className="grid grid-cols-2 gap-5"><div><label className="text-xs font-bold text-slate-500 mb-1 block">姓名</label><input className="input-field" value={editForm.name||''} onChange={e=>setEditForm({...editForm, name:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">電話</label><input className="input-field" value={editForm.phone||''} onChange={e=>setEditForm({...editForm, phone:e.target.value})}/></div></div><div className="flex gap-2"><select className="input-field w-32" value={editForm.gender} onChange={e=>setEditForm({...editForm, gender:e.target.value})}><option value="女">女客</option><option value="男">男客</option><option value="兒童">兒童</option></select><div className="flex-1"><label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師</label><select className="input-field" value={editForm.preferredStylistId || ''} onChange={e=>setEditForm({...editForm, preferredStylistId: e.target.value})}><option value="">未指定</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">備註事項</label><textarea className="input-field" rows="3" value={editForm.notes||''} onChange={e=>setEditForm({...editForm, notes:e.target.value})}/></div><button onClick={handleSave} className="btn btn-primary w-full py-3">儲存資料</button></div></Modal>)}
+                        {viewingCustomer && !isEditing && (<Modal title={`${viewingCustomer.name} 的消費紀錄`} onClose={()=>setViewingCustomer(null)} size="max-w-2xl"><div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200"><div><div className="text-sm text-slate-500">會員電話</div><div className="font-bold font-mono text-lg">{viewingCustomer.phone}</div></div><div className="text-right"><div className="text-sm text-slate-500">歷史總消費</div><div className="font-black text-2xl text-indigo-600">{formatCurrency(viewingCustomer.totalSpend || 0)}</div></div></div><div className="text-sm text-slate-500">專屬設計師: <span className="font-bold text-slate-800">{safeStylists.find(s=>s.id===viewingCustomer.preferredStylistId)?.name || '未指定'}</span></div><div className="border-t pt-4"><h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Settings size={18}/> 近期消費明細</h4><div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">{safeTransactions.filter(t=>t.customerId===viewingCustomer.id).length===0?(<div className="text-center text-slate-400 py-8">尚無消費紀錄</div>):(safeTransactions.filter(t=>t.customerId===viewingCustomer.id).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(<div key={t.id} className="border p-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center"><div><div className="font-bold text-slate-700">{new Date(t.date).toLocaleDateString()} <span className="text-xs text-slate-400 font-normal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><div className="text-sm text-slate-500 mt-1 flex gap-2">{(t.items||[]).map((i,idx)=><span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-xs">{i.name}</span>)}</div></div><div className="text-right"><div className="font-bold text-slate-800">{formatCurrency(t.total)}</div><div className="text-xs text-slate-400">{safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未知設計師'}</div></div></div>)))}</div></div><div className="flex gap-2 pt-2"><button onClick={()=>{setEditForm(viewingCustomer); setIsEditing(true);}} className="btn btn-secondary flex-1">編輯資料</button><button onClick={()=>handleDeleteCustomer(viewingCustomer.id)} className="btn btn-danger flex-1">刪除會員</button></div></div></Modal>)}
+                    </div>
+                );
+            };
+
+            const SettingsView = () => {
+                const [categoryInput, setCategoryInput] = useState('');
+                const [expenseTypeInput, setExpenseTypeInput] = useState('');
+                const [isEditingItem, setIsEditingItem] = useState(false);
+                const [itemForm, setItemForm] = useState({});
+                const [itemSearch, setItemSearch] = useState('');
+
+                const addCategory = () => { if(categoryInput && !safeSettings.categories.includes(categoryInput)) { setSettings({...safeSettings, categories: [...safeSettings.categories, categoryInput]}); setCategoryInput(''); } };
+                const addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings({...safeSettings, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]}); setExpenseTypeInput(''); } };
+                const removeCategory = (cat) => setSettings({...safeSettings, categories: safeSettings.categories.filter(c=>c!==cat)});
+                const removeExpenseType = (type) => setSettings({...safeSettings, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)});
+                const exportBackup = () => {
+                    try {
+                        const backupData = { services: safeServices, stylists: safeStylists, customers: safeCustomers, transactions: safeTransactions, settings: safeSettings, inventoryLogs: safeInventoryLogs, expenses: safeExpenses };
+                        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a'); link.href = url; link.download = `salon_backup_${getCurrentDateLocal()}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); showToast('備份下載已啟動');
+                    } catch (error) { console.error(error); alert('備份失敗'); }
+                };
+  const importBackup = (event) => {
+        const fileReader = new FileReader();
+        if (!event.target.files[0]) return;
+        
+        fileReader.readAsText(event.target.files[0], "UTF-8");
+        fileReader.onload = async (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (confirm('確定要「恢復舊檔案」並同步至雲端嗎？\n(這會將舊資料與雲端現有資料合併)')) {
+                    
+                    // 1. 先寫入本機 LocalStorage (確保格式對齊)
+                    const dataMap = {
+                        'salon_services': parsed.services || [],
+                        'salon_stylists': parsed.stylists || [],
+                        'salon_customers': parsed.customers || [],
+                        'salon_transactions': parsed.transactions || [],
+                        'salon_expenses': parsed.expenses || [],
+                        'salon_settings': parsed.settings || {},
+                        'salon_inventory_logs': parsed.inventoryLogs || []
+                    };
+
+                    Object.entries(dataMap).forEach(([key, val]) => {
+                        localStorage.setItem(key, JSON.stringify(val));
+                    });
+
+                    // 2. 【核心補強】手動建構一個符合後端期待的「大禮包」
+                    const syncPayload = {
+                        services: dataMap['salon_services'],
+                        stylists: dataMap['salon_stylists'],
+                        customers: dataMap['salon_customers'],
+                        transactions: dataMap['salon_transactions'],
+                        expenses: dataMap['salon_expenses'],
+                        settings: dataMap['salon_settings'],
+                        inventoryLogs: dataMap['salon_inventory_logs']
+                    };
+
+                    showToast("正在將舊檔案合併至雲端...");
+                    
+                    // 3. 暴力同步：直接呼叫 POST，不透過自動感應
+                    try {
+                        const response = await fetch(GAS_URL, {
+                            method: 'POST',
+                            body: JSON.stringify(syncPayload)
+                        });
+                        
+                        if (response.ok) {
+                            showToast("✅ 舊檔案已成功合併進雲端！");
+                        }
+                    } catch (err) {
+                        console.error("同步失敗:", err);
+                    }
+
+                    // 4. 等待 1.5 秒讓 Google 寫入完成後再刷新
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } catch (err) {
+                alert('檔案讀取失敗，請確認是否為正確的 JSON 備份檔');
+            }
+        };
+    }; 
+                const handleSaveItem = () => {
+                    if (!itemForm.name || !itemForm.price) { alert('請輸入名稱與價格'); return; }
+                    const newItem = { ...itemForm, price: Number(itemForm.price), cost: Number(itemForm.cost || 0), stock: itemForm.isProduct ? (itemForm.stock !== null ? itemForm.stock : 0) : null };
+                    if (newItem.id) setServices(safeServices.map(s => s.id === newItem.id ? newItem : s));
+                    else setServices([...safeServices, { ...newItem, id: generateId() }]);
+                    setIsEditingItem(false); setItemForm({}); showToast('項目已儲存');
+                };
+                const handleDeleteItem = (id) => {
+                    confirmAction('刪除項目', '確定刪除？這不會影響歷史訂單，但此項目將不再顯示於開單列表。', () => {
+                        setServices(safeServices.filter(s => s.id !== id)); showToast('項目已刪除');
+                    });
+                };
+
+                const filteredServices = safeServices.filter(s => s.name.includes(itemSearch) || s.category.includes(itemSearch));
+                const allRoles = [...new Set(safeStylists.map(s => s.role || '設計師')), '店長', '設計師', '助理'];
+
+                return (
+                    <div className="p-6 md:p-10 h-full overflow-y-auto max-w-6xl mx-auto space-y-8">
+                        <div className="card p-8 border-l-4 border-indigo-500">
+                            <h3 className="font-bold text-xl mb-6 text-slate-800 flex items-center gap-2"><Palette size={24} className="text-indigo-500"/> 外觀色彩設定 (Color Themes)</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">顧客性別標示顏色 (男/女/兒童)</h4><div className="space-y-3">{Object.keys(safeSettings.genderColors).map(gender => (<div key={gender} className="flex justify-between items-center"><span className="font-bold text-slate-700">{gender}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.genderColors[gender] || 'slate'} onChange={e => setSettings({...safeSettings, genderColors: {...safeSettings.genderColors, [gender]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
+                                <div><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">人員職位標示顏色</h4><div className="space-y-3">{allRoles.filter((v,i,a)=>a.indexOf(v)===i).map(role => (<div key={role} className="flex justify-between items-center"><span className="font-bold text-slate-700">{role}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.roleColors[role] || 'slate'} onChange={e => setSettings({...safeSettings, roleColors: {...safeSettings.roleColors, [role]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
+                                <div className="md:col-span-2"><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">服務分類卡片顏色</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">{safeSettings.categories.map(cat => (<div key={cat} className="flex justify-between items-center"><span className="font-bold text-slate-700">{cat}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.categoryColors[cat] || 'slate'} onChange={e => setSettings({...safeSettings, categoryColors: {...safeSettings.categoryColors, [cat]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
+                            </div>
+                        </div>
+                        <div className="card p-8">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"><div><h3 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Tag size={24} className="text-indigo-500"/> 價目表與商品管理</h3><p className="text-sm text-slate-500 mt-1">設定服務項目、價格、成本與庫存商品</p></div><div className="flex gap-2 w-full md:w-auto"><div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input className="input-field pl-10 py-2" placeholder="搜尋項目..." value={itemSearch} onChange={e=>setItemSearch(e.target.value)}/></div><button onClick={()=>{setItemForm({category: safeSettings.categories[0], isProduct: false, price: 0, cost: 0}); setIsEditingItem(true);}} className="btn btn-primary whitespace-nowrap"><Plus size={18}/> 新增項目</button></div></div>
+                            <div className="overflow-x-auto border rounded-xl"><table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 border-b font-bold text-slate-600"><tr><th className="p-4">類別</th><th className="p-4">名稱</th><th className="p-4 text-right">售價</th><th className="p-4 text-right">成本</th><th className="p-4 text-center">庫存管理</th><th className="p-4 text-center">操作</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredServices.map(s => (<tr key={s.id} className="hover:bg-slate-50"><td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">{s.category}</span></td><td className="p-4 font-bold text-slate-700">{s.name}</td><td className="p-4 text-right font-bold text-indigo-600">{formatCurrency(s.price)}</td><td className="p-4 text-right text-slate-500">{s.cost>0?formatCurrency(s.cost):'-'}</td><td className="p-4 text-center">{s.isProduct?<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold">已啟用 (存: {s.stock})</span>:<span className="text-xs text-slate-400">-</span>}</td><td className="p-4 text-center flex justify-center gap-2"><button onClick={()=>{setItemForm(s); setIsEditingItem(true);}} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={16}/></button><button onClick={()=>handleDeleteItem(s.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button></td></tr>))}{filteredServices.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400">無符合項目</td></tr>}</tbody></table></div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-8">
+                            <div className="card p-8"><h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3><label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer"><input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>setSettings({...safeSettings, deductCostBeforeCommission:e.target.checked})} className="w-5 h-5 accent-indigo-600"/> <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span></label><h4 className="text-sm font-bold text-slate-500 mb-3">各分類預設抽成率 (%)</h4><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">{safeSettings.categories.map(c=>(<div key={c} className="p-4 bg-slate-50 rounded-xl border border-slate-200"><div className="text-xs font-bold text-slate-400 mb-2">{c}</div><input type="number" className="w-full bg-transparent font-black text-xl border-b border-slate-300 focus:border-indigo-500 outline-none text-center" value={safeSettings.commissionRates[c]||0} onChange={e=>{const newRates={...safeSettings.commissionRates,[c]:Number(e.target.value)}; setSettings({...safeSettings, commissionRates:newRates})}}/></div>))}</div></div>
+                            <div className="card p-8"><h3 className="font-bold text-xl mb-6 text-slate-800">分類管理</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h4 className="text-sm font-bold text-slate-500 mb-3">服務/商品分類</h4><div className="flex gap-3 mb-4"><input className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/><button onClick={addCategory} className="btn btn-secondary">新增</button></div><div className="flex flex-wrap gap-2">{safeSettings.categories.map(c=>(<span key={c} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{c} <button onClick={()=>removeCategory(c)} className="text-slate-400 hover:text-red-500 transition-colors"><X size={14}/></button></span>))}</div></div><div><h4 className="text-sm font-bold text-slate-500 mb-3">支出項目分類</h4><div className="flex gap-3 mb-4"><input className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/><button onClick={addExpenseType} className="btn btn-secondary">新增</button></div><div className="flex flex-wrap gap-2">{safeSettings.expenseTypes.map(t=>(<span key={t} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{t} <button onClick={()=>removeExpenseType(t)} className="text-slate-400 hover:text-red-500 transition-colors"><X size={14}/></button></span>))}</div></div></div></div>
+                            <div className="card p-8"><h3 className="font-bold text-xl mb-6 text-slate-800">系統維護</h3><div className="flex gap-4 flex-wrap"><button onClick={exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button><label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={importBackup}/></label><button onClick={() => confirmAction('重置系統', '這將清空所有資料且無法復原！', () => { localStorage.clear(); window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button></div></div>
+                        </div>
+                        {isEditingItem && (<Modal title={itemForm.id ? '編輯項目' : '新增項目'} onClose={()=>setIsEditingItem(false)}><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-slate-500 mb-1 block">名稱</label><input className="input-field" value={itemForm.name||''} onChange={e=>setItemForm({...itemForm, name: e.target.value})} placeholder="例如: 洗髮精"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">分類</label><select className="input-field" value={itemForm.category} onChange={e=>setItemForm({...itemForm, category: e.target.value})}>{safeSettings.categories.map(c=><option key={c} value={c}>{c}</option>)}</select></div></div><div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-slate-500 mb-1 block">售價</label><input type="number" className="input-field" value={itemForm.price||0} onChange={e=>setItemForm({...itemForm, price: e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">成本 (計算毛利/支出用)</label><input type="number" className="input-field" value={itemForm.cost||0} onChange={e=>setItemForm({...itemForm, cost: e.target.value})}/></div></div><div className="border-t pt-4 mt-2"><label className="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg cursor-pointer hover:bg-slate-100"><input type="checkbox" className="w-5 h-5 accent-indigo-600" checked={itemForm.isProduct||false} onChange={e=>setItemForm({...itemForm, isProduct: e.target.checked})}/><div><div className="font-bold text-slate-700">啟用庫存管理</div><div className="text-xs text-slate-500">勾選後此項目將出現在「庫存頁面」，可進行進貨與領用。</div></div></label></div><button onClick={handleSaveItem} className="btn btn-primary w-full py-3 mt-2">儲存項目</button></div></Modal>)}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex h-screen overflow-hidden bg-slate-100">
+                    <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
+                        <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
+                        <nav className="flex-1 p-4 space-y-2">
+                            {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
+                        </nav>
+                        {/* 雲端同步按鈕區塊 */}
+        <div className="mx-4 mt-auto mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Database Sync</div>
+            <button 
+                onClick={syncFromCloud}
+                disabled={isSyncing}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all text-xs border border-emerald-200 shadow-sm disabled:opacity-50"
+            >
+                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                強制抓取雲端更新
+            </button>
+            <button 
+                onClick={syncToCloud}
+                disabled={isSyncing}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all text-xs shadow-md disabled:opacity-50"
+            >
+                <Upload size={14} />
+                手動備份至雲端
+            </button>
+        </div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.0 Ultimate</div>
+                    </aside>
+                    {/* 1. 手機版全螢幕選單 */}
+            {isMobileMenuOpen && (
+                <div className="lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
+                    <div className="flex justify-between items-center py-6 border-b border-white/10">
+                        <div className="font-bold text-xl">系統選單</div>
+                        <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X size={32}/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto pt-4 pb-10">
+                        {[ 
+                            {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
+                            {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'} 
+                        ].map(item => (
+                            <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
+                        ))}
+                        
+                        {/* 手機版雲端按鈕：放在選單最下面 */}
+                        <div className="grid grid-cols-2 gap-4 mt-8">
+                            <button onClick={() => { syncFromCloud(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-4 bg-emerald-600 rounded-2xl font-bold active:scale-95">
+                                <RefreshCw size={24}/> 抓取更新
+                            </button>
+                            <button onClick={() => { syncToCloud(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-4 bg-indigo-600 rounded-2xl font-bold active:scale-95">
+                                <Upload size={24}/> 備份雲端
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 2. 主內容區：pt-[env(safe-area-inset-top)] 解決 iPhone 點不到頂部問題 */}
+            <main className="flex-1 w-full h-screen overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top)]">
+                {/* 手機版頂欄 */}
+                <div className="lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
+                    <div className="font-bold flex items-center gap-2 text-slate-800">
+                        <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
+                    </div>
+                    <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg active:bg-slate-200"><Menu size={24}/></button>
+                </div>
+
+                <div className="flex-1 overflow-auto bg-slate-50">
+                    {activeTab === 'pos' && <POSView />}
+                    {activeTab === 'orders' && <OrderView />}
+                    {activeTab === 'report' && <ReportView />}
+                    {activeTab === 'customers' && <CustomerView />}
+                    {activeTab === 'staff' && <StaffView />}
+                    {activeTab === 'inventory' && <InventoryView />}
+                    {activeTab === 'settings' && <SettingsView />}
+                </div>
+            </main>
+
+            <ConfirmModal {...confirmDialog} />
+            {notification && (
+                <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-fade-in text-white font-bold flex items-center gap-2 whitespace-nowrap ${notification.type==='error'?'bg-red-500':'bg-slate-800'}`}>
+                    {notification.type==='error'?<X size={20}/>:<CheckCircle size={20}/>} {notification.msg}
+                </div>
+            )}
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<HairSalonApp />);
+    </script>
+</body>
+</html>
