@@ -230,13 +230,11 @@
         );
 
        // --- 6. App ---
-const GAS_URL = "https://script.google.com/macros/s/AKfycbz7INcC1Cv1QYEV28GthSpXUiSeKtFKoDaZdWgZbtBaI_4XRta-H020Mz8t1beIgztc6g/exec"
 function HairSalonApp() {
     const [activeTab, setActiveTab] = useState('pos');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [notification, setNotification] = useState(null);
-    const [isSyncing, setIsSyncing] = useState(false); // 新增同步狀態指標
-
+const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
     // States (維持原有的定義)
     const [services, setServices] = useStickyState('salon_services', DEFAULT_SERVICES);
     const [stylists, setStylists] = useStickyState('salon_stylists', DEFAULT_STYLISTS);
@@ -256,99 +254,16 @@ function HairSalonApp() {
         genderColors: DEFAULT_GENDER_COLORS
     });
 
-    // --- 自動監控：當單據、客資、人員變動時，延遲 3 秒自動備份 ---
-    React.useEffect(() => {
-        if (transactions.length === 0 && customers.length === 0) return;
-
-        const timer = setTimeout(() => {
-            console.log("偵測到變動，準備自動雲端備份...");
-            syncToCloud();
-        }, 3000); 
-
-        return () => clearTimeout(timer); 
-    }, [transactions, customers, stylists, expenses]);
-    // 1. 雲端抓取功能：確保能把雲端的大庫房抓回來合併
+   // --- 徹底去中心化：掏空雲端同步邏輯 ---
     const syncFromCloud = async () => {
-        setIsSyncing(true);
-        try {
-            const response = await fetch(GAS_URL);
-            const cloudData = await response.json();
-            if (cloudData && cloudData.services) {
-                
-                // --- 這裡是最關鍵的補強：把雲端的人員名單接住 ---
-                if (cloudData.stylists) {
-                    setStylists(cloudData.stylists);
-                    localStorage.setItem('salon_stylists', JSON.stringify(cloudData.stylists));
-                }
-                // ------------------------------------------
-
-                // 同步其他資料
-                setServices(cloudData.services);
-                setCustomers(cloudData.customers || []);
-                setTransactions(cloudData.transactions || []);
-                setSettings(cloudData.settings || {});
-                setInventoryLogs(cloudData.inventoryLogs || []);
-                setExpenses(cloudData.expenses || []);
-
-                // 同步至本地硬碟存檔
-                localStorage.setItem('salon_services', JSON.stringify(cloudData.services));
-                localStorage.setItem('salon_customers', JSON.stringify(cloudData.customers || []));
-                localStorage.setItem('salon_transactions', JSON.stringify(cloudData.transactions || []));
-                localStorage.setItem('salon_settings', JSON.stringify(cloudData.settings || {}));
-                localStorage.setItem('salon_inventory_logs', JSON.stringify(cloudData.inventoryLogs || []));
-                localStorage.setItem('salon_expenses', JSON.stringify(cloudData.expenses || []));
-
-                showToast("✅ 雲端資料已成功鎖定至此裝置");
-            }
-        } catch (e) { 
-            showToast("連線失敗", "error"); 
-        } finally { 
-            setIsSyncing(false); 
-        }
+        // 不執行任何動作，僅提示
+        showToast("已切換為單機版本，無雲端資料可抓取");
     };
 
-    // 2. 雲端備份功能：把本機所有東西（含恢復的舊單）推上去
- const syncToCloud = async () => {
-        if (isSyncing) return;
-        
-        // --- 1. 改良防呆攔截：不再死鎖，允許刪除到剩下 0 筆時也能同步 ---
-        if (transactions.length === 0 && customers.length === 0) {
-            if (!confirm('偵測到目前無任何單據與客戶，確定要清空雲端資料嗎？')) {
-                return;
-            }
-        }
-
-        setIsSyncing(true);
-
-        // --- 2. 核心封裝：確保「人員名單 (stylists)」與「最新時間 (lastUpdated)」都有包進去 ---
-        const allData = { 
-            services, 
-            stylists,      // 👈 補強：確保人員名字會跟著走
-            customers, 
-            transactions, 
-            settings, 
-            inventoryLogs, 
-            expenses,
-            lastUpdated: new Date().getTime() // 👈 重要：有了這個，刪除動作才會生效
-        };
-
-        try {
-            // --- 3. 發送請求 ---
-            const response = await fetch(GAS_URL, { 
-                method: 'POST', 
-                body: JSON.stringify(allData) 
-            });
-
-            if (response.ok) {
-                showToast("☁️ 雲端同步成功 (含人員與刪除紀錄)");
-            } else {
-                showToast("同步失敗：雲端無回應", "error");
-            }
-        } catch (e) {
-            showToast("同步失敗：連線異常", "error");
-        } finally {
-            setIsSyncing(false);
-        }
+    const syncToCloud = async () => {
+        // 不執行任何動作，直接回傳，避免報錯
+        console.log("單機模式：略過雲端備份");
+        return;
     };
             // Fallback for missing settings if loading from old data
             const safeSettings = {
@@ -427,8 +342,9 @@ function HairSalonApp() {
                     }).sort((a,b) => new Date(b.date) - new Date(a.date));
                 }, [safeTransactions, queryDate, searchTerm, dateMode, filterStylist]);
 
-             const handleDeleteOrder = (orderId) => {
-        confirmAction('刪除訂單', '確定要刪除此筆訂單？此動作將同步至雲端。', async () => {
+                        const handleDeleteOrder = (orderId) => {
+       
+                confirmAction('刪除訂單', '確定要刪除此筆訂單？', async () => {
             // 1. 先從本地陣列中移除
             const updatedTransactions = transactions.filter(t => t.id !== orderId);
             
@@ -447,50 +363,35 @@ function HairSalonApp() {
                 });
                 setCustomers(updatedCustomers);
             }
-
-            // 3. 【關鍵：更新本地狀態】
-            setTransactions(updatedTransactions);
-            
-            // 4. 【核心補強：強迫同步】
-            // 這裡不呼叫 syncToCloud()，因為它有防呆攔截，我們直接手動發送 POST
-            showToast("正在同步刪除動作...");
-            const allData = { 
-                services, stylists, 
-                customers: customers, // 這裡要小心，如果是剛更新的要拿最新變數
-                transactions: updatedTransactions, // 傳送已經刪除後的陣列
-                settings, inventoryLogs, expenses,
-                lastUpdated: new Date().getTime() 
-            };
-
-            try {
-                const response = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(allData) });
-                if (response.ok) showToast("☁️ 雲端已同步刪除");
-            } catch (e) {
-                showToast("刪除同步失敗，請手動按備份", "error");
-            }
+         
+            setTransactions(updatedTransactions); 
+            showToast('訂單已刪除');
+      
         });
     };
 
-                const handleUpdateOrder = (updatedOrder) => {
-                    const newTransactions = safeTransactions.map(t => t.id === updatedOrder.id ? updatedOrder : t);
-                    setTransactions(newTransactions);
+const handleUpdateOrder = (updatedOrder) => {
+    // 定義為 newTransactions
+    const newTransactions = safeTransactions.map(t => t.id === updatedOrder.id ? updatedOrder : t);
 
-                    const oldOrder = safeTransactions.find(t => t.id === updatedOrder.id);
-                    if (oldOrder && oldOrder.customerId && oldOrder.total !== updatedOrder.total) {
-                        const diff = updatedOrder.total - oldOrder.total;
-                        const updatedCustomers = safeCustomers.map(c => {
-                            if (c.id === oldOrder.customerId) {
-                                return { ...c, totalSpend: (c.totalSpend || 0) + diff };
-                            }
-                            return c;
-                        });
-                        setCustomers(updatedCustomers);
-                    }
-                    
-                    setEditingOrder(null);
-                    showToast('訂單已修正');
-                };
+    const oldOrder = safeTransactions.find(t => t.id === updatedOrder.id);
+    if (oldOrder && oldOrder.customerId && oldOrder.total !== updatedOrder.total) {
+        const diff = updatedOrder.total - oldOrder.total;
+        const updatedCustomers = safeCustomers.map(c => {
+            if (c.id === oldOrder.customerId) {
+                return { ...c, totalSpend: (c.totalSpend || 0) + diff };
+            }
+            return c;
+        });
+        setCustomers(updatedCustomers); // 確保客戶累計也更新
+    }
+    
+    // --- 修正：使用正確的變數名稱並移除重複行 ---
+    setTransactions(newTransactions); 
 
+    setEditingOrder(null);
+    showToast('訂單已修正');
+};
                 // Edit Modal Inner Component
                 const EditOrderModal = ({ order, onClose, onSave }) => {
                     const [form, setForm] = useState(JSON.parse(JSON.stringify(order))); 
@@ -1173,39 +1074,7 @@ const handleCheckout = (paymentMethod) => {
                     createdAt: new Date().toISOString() 
                 };
 
-                // 2. 存入交易紀錄
-                setTransactions(prev => [newOrder, ...prev]);
-
-                // 2. 如果是會員，更新他的消費累計 (先算好最新資料)
-                    const updatedCustomers = selectedCustomer ? customers.map(c => 
-                        c.id === selectedCustomer.id ? { ...c, totalSpent: (c.totalSpent || 0) + cartTotal } : c
-                    ) : customers;
-                    const updatedTransactions = [newOrder, ...transactions];
-
-                    setCustomers(updatedCustomers);
-                    setTransactions(updatedTransactions);
-
-                    // 4. 清空購物車與狀態
-                    setCart([]);
-                    setSelectedCustomer(null);
-                    setAdHocCustomerName('');
-                    setShowCheckout(false);
-
-                    // 5. 顯示通知
-                    showToast("✅ 結帳成功！");
-
-                    // --- 🚀 修改這裡：把最新包裹直接遞給它 ---
-                    setTimeout(() => {
-                        if (typeof syncToCloud === 'function') {
-                            syncToCloud({
-                                services, stylists, settings, inventoryLogs, expenses,
-                                transactions: updatedTransactions, // 帶上最新的單
-                                customers: updatedCustomers       // 帶上最新的客資
-                            });
-                        }
-                    }, 1500);
-
-// 1. 更新商品庫存
+        // 1. 更新商品庫存
         const updatedServices = safeServices.map(s => {
             const cartItems = cart.filter(i => i.id === s.id);
             if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
@@ -1230,8 +1099,6 @@ const handleCheckout = (paymentMethod) => {
         setSelectedCustomer(null); 
         setAdHocCustomerName(''); 
         setShowCheckout(false); 
-        showToast('結帳成功！');
-        setTimeout(syncToCloud, 1000); // 結帳完 1 秒鐘後自動上傳雲端
         
         // 5. 自動備份邏輯
         if (safeSettings.autoBackup) {
@@ -1559,7 +1426,7 @@ const handleCheckout = (paymentMethod) => {
         fileReader.onload = async (e) => {
             try {
                 const parsed = JSON.parse(e.target.result);
-                if (confirm('確定要「恢復舊檔案」並同步至雲端嗎？\n(這會將舊資料與雲端現有資料合併)')) {
+               if (confirm('確定要「還原舊檔案」嗎？\n這將覆蓋目前的本機資料。')) {
                     
                     // 1. 先寫入本機 LocalStorage (確保格式對齊)
                     const dataMap = {
@@ -1575,38 +1442,10 @@ const handleCheckout = (paymentMethod) => {
                     Object.entries(dataMap).forEach(([key, val]) => {
                         localStorage.setItem(key, JSON.stringify(val));
                     });
-
-                    // 2. 【核心補強】手動建構一個符合後端期待的「大禮包」
-                    const syncPayload = {
-                        services: dataMap['salon_services'],
-                        stylists: dataMap['salon_stylists'],
-                        customers: dataMap['salon_customers'],
-                        transactions: dataMap['salon_transactions'],
-                        expenses: dataMap['salon_expenses'],
-                        settings: dataMap['salon_settings'],
-                        inventoryLogs: dataMap['salon_inventory_logs']
-                    };
-
-                    showToast("正在將舊檔案合併至雲端...");
-                    
-                    // 3. 暴力同步：直接呼叫 POST，不透過自動感應
-                    try {
-                        const response = await fetch(GAS_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(syncPayload)
-                        });
-                        
-                        if (response.ok) {
-                            showToast("✅ 舊檔案已成功合併進雲端！");
-                        }
-                    } catch (err) {
-                        console.error("同步失敗:", err);
-                    }
-
-                    // 4. 等待 1.5 秒讓 Google 寫入完成後再刷新
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
+                
+                   alert('資料還原成功，系統即將重新整理');
+                   window.location.reload(); 
+             
                 }
             } catch (err) {
                 alert('檔案讀取失敗，請確認是否為正確的 JSON 備份檔');
@@ -1659,27 +1498,7 @@ const handleCheckout = (paymentMethod) => {
                         <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
-                        </nav>
-                        {/* 雲端同步按鈕區塊 */}
-        <div className="mx-4 mt-auto mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Database Sync</div>
-            <button 
-                onClick={syncFromCloud}
-                disabled={isSyncing}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all text-xs border border-emerald-200 shadow-sm disabled:opacity-50"
-            >
-                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
-                強制抓取雲端更新
-            </button>
-            <button 
-                onClick={syncToCloud}
-                disabled={isSyncing}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all text-xs shadow-md disabled:opacity-50"
-            >
-                <Upload size={14} />
-                手動備份至雲端
-            </button>
-        </div>
+                        </nav>                 
                         <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.0 Ultimate</div>
                     </aside>
                     {/* 1. 手機版全螢幕選單 */}
@@ -1697,15 +1516,6 @@ const handleCheckout = (paymentMethod) => {
                             <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
                         ))}
                         
-                        {/* 手機版雲端按鈕：放在選單最下面 */}
-                        <div className="grid grid-cols-2 gap-4 mt-8">
-                            <button onClick={() => { syncFromCloud(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-4 bg-emerald-600 rounded-2xl font-bold active:scale-95">
-                                <RefreshCw size={24}/> 抓取更新
-                            </button>
-                            <button onClick={() => { syncToCloud(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-4 bg-indigo-600 rounded-2xl font-bold active:scale-95">
-                                <Upload size={24}/> 備份雲端
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
