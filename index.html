@@ -260,19 +260,72 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         genderColors: DEFAULT_GENDER_COLORS
     });
 
-   // --- 1. 生成隨機金鑰函數 ---
+// --- 1. 生成金鑰並「自動複製」 ---
     const generateSyncToken = () => {
-        // 生成 8 位數隨機英數大寫鑰匙
+        // 生成 8 位數隨機金鑰
         const token = Math.random().toString(36).substring(2, 10).toUpperCase();
-        setSettings({ ...safeSettings, syncToken: token });
-        showToast(`新金鑰已生成: ${token}`);
+        
+        // 取得目前的 Shop ID，如果沒填就用 Default
+        const currentShopID = settings.shopID || "MySalon";
+        
+        // 合併為：店號-金鑰 (例如: SpecialSpace-A1B2C3D4)
+        const combinedKey = `${currentShopID}-${token}`;
+        
+        setSettings({ ...settings, syncToken: combinedKey });
+        
+        // 自動執行複製
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(combinedKey).then(() => {
+                showToast(`金鑰已複製: ${combinedKey}`);
+            }).catch(() => {
+                showToast(`金鑰已生成: ${combinedKey}`);
+            });
+        }
     };
 
-    // --- 2. 雲端下載邏輯 (恢復功能) ---
+    // --- 2. 激活雲端系統 (整合第一次存檔，確保後台立刻出現資料) ---
+    const activateCloudSync = async () => {
+        const { cloudKey, syncToken, shopID } = safeSettings;
+        if (!cloudKey || !syncToken) {
+            showToast("請填寫鑰匙並生成金鑰", "error");
+            return;
+        }
+
+        try {
+            // 激活時立刻進行 PUT 上傳，這會在 Firebase 後台直接建立資料夾
+            const url = `https://${cloudKey}.firebasedatabase.app/SalonPOS/${syncToken}.json`;
+            const backupData = { 
+                services, 
+                stylists, 
+                customers, 
+                transactions, 
+                settings: { ...safeSettings, isActivated: true }, // 標記為激活狀態
+                inventoryLogs, 
+                expenses,
+                lastUpdated: new Date().toISOString()
+            };
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                body: JSON.stringify(backupData)
+            });
+
+            if (response.ok) {
+                setSettings({ ...safeSettings, isActivated: true });
+                showToast("系統激活成功！雲端存檔已連動");
+            } else {
+                throw new Error();
+            }
+        } catch (err) {
+            showToast("激活失敗，請檢查 Firebase ID 或網路", "error");
+        }
+    };
+
+    // --- 3. 雲端下載還原 (完整保留您原本的所有恢復邏輯) ---
     const syncFromCloud = async () => {
         const { cloudKey, syncToken } = safeSettings;
         if (!syncToken || !cloudKey) {
-            showToast("請先輸入或生成金鑰與鑰匙", "error");
+            showToast("請先確認金鑰與鑰匙已填寫", "error");
             return;
         }
 
@@ -284,7 +337,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             const data = await response.json();
 
             if (data) {
-                // 逐一恢復所有資料狀態
+                // --- 這裡是您最重視的恢復邏輯，完整保留絕不刪減 ---
                 if (data.services) setServices(data.services);
                 if (data.stylists) setStylists(data.stylists);
                 if (data.customers) setCustomers(data.customers);
@@ -304,7 +357,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         }
     };
 
-    // --- 3. 雲端備份邏輯 ---
+    // --- 4. 雲端備份邏輯 (手動上傳同步) ---
     const syncToCloud = async () => {
         const { cloudKey, syncToken } = safeSettings; 
 
@@ -314,7 +367,6 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         }
 
         try {
-            // 資料會存在 SalonPOS 資料夾下的 [syncToken].json
             const url = `https://${cloudKey}.firebasedatabase.app/SalonPOS/${syncToken}.json`;
             
             const backupData = { 
@@ -341,8 +393,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         } catch (err) {
             showToast("同步出錯，請檢查 Firebase 設定", "error");
         }
-    };
-            // Fallback for missing settings if loading from old data
+    };            // Fallback for missing settings if loading from old data
             const safeSettings = {
                 categories: settings.categories || DEFAULT_CATEGORIES,
                 expenseTypes: settings.expenseTypes || DEFAULT_EXPENSE_TYPES,
@@ -1567,45 +1618,46 @@ const handleCheckout = (paymentMethod) => {
     </h3>
     
     <div className="space-y-4 mb-6">
+        {/* Firebase ID 必須分開，因為這是系統基礎地址 */}
         <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">我的店號 (Shop ID)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">雲端伺服器鑰匙 (Firebase ID)</label>
             <input 
-                className="input-field" 
-                placeholder="例如：SpecialSpace01" 
-                value={safeSettings.shopID || ''} 
-                onChange={e => setSettings({...safeSettings, shopID: e.target.value})}
+                className="input-field font-mono" 
+                placeholder="請輸入 Firebase 專案 ID" 
+                defaultValue={settings.cloudKey}
+                onBlur={e => setSettings({...settings, cloudKey: e.target.value})}
             />
+            <p className="text-[10px] text-slate-400 mt-1">※ 填寫後請點擊框外確認，以防打字時跳掉。</p>
         </div>
 
         <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">雲端同步鑰匙 (Firebase Project ID)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">我的店號與同步金鑰 (ShopID-Token)</label>
             <div className="flex gap-2">
                 <input 
-                    className="input-field font-mono" 
-                    placeholder="請輸入你的 Firebase 專案 ID" 
-                    value={safeSettings.cloudKey || ''} 
-                    onChange={e => setSettings({...safeSettings, cloudKey: e.target.value})}
+                    className="input-field font-mono text-lg text-indigo-600 font-bold bg-white" 
+                    placeholder="點擊右側生成或手動輸入" 
+                    value={settings.syncToken || ''} 
+                    onChange={e => setSettings({...settings, syncToken: e.target.value})}
                 />
-                {/* 雖然鑰匙通常是固定的 Firebase ID，但我們可以提供一個快速填入或說明的按鈕 */}
                 <button 
-                    onClick={() => alert("請填入你 Firebase 後台的 Project ID (例如：salon-pos-12345)")}
-                    className="btn btn-secondary text-xs px-3"
+                    onClick={generateSyncToken} 
+                    className="btn btn-secondary whitespace-nowrap border-slate-300 shadow-sm"
                 >
-                    幫助
+                    自動生成並複製
                 </button>
             </div>
+            <p className="text-[10px] text-slate-400 mt-2">提示：這串就是你的雲端門牌。若要備份，請點下方「上傳存檔」。</p>
         </div>
     </div>
 
     <div className="flex gap-4">
         <button onClick={syncToCloud} className="btn btn-primary flex-1 py-3 font-bold shadow-lg">
-            <Upload size={18}/> 備份上傳
+            <Upload size={18}/> 立即備份 (上傳)
         </button>
         <button onClick={syncFromCloud} className="btn btn-secondary flex-1 py-3 font-bold">
-            <Download size={18}/> 還原下載
+            <Download size={18}/> 恢復資料 (下載)
         </button>
     </div>
-
     <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
         <p className="text-xs text-slate-500 mb-2">💡 提示：你的店號決定了雲端資料夾的名稱，不會跟護髮卡或其他系統混在一起。</p>
     </div>
@@ -1615,44 +1667,6 @@ const handleCheckout = (paymentMethod) => {
     
     {/* --- 原有的：分類管理 --- */}
     <div className="card p-8"><h3 className="font-bold text-xl mb-6 text-slate-800">分類管理</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h4 className="text-sm font-bold text-slate-500 mb-3">服務/商品分類</h4><div className="flex gap-3 mb-4"><input className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/><button onClick={addCategory} className="btn btn-secondary">新增</button></div><div className="flex flex-wrap gap-2">{safeSettings.categories.map(c=>(<span key={c} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{c} <button onClick={()=>removeCategory(c)} className="text-slate-400 hover:text-red-500 transition-colors"><X size={14}/></button></span>))}</div></div><div><h4 className="text-sm font-bold text-slate-500 mb-3">支出項目分類</h4><div className="flex gap-3 mb-4"><input className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/><button onClick={addExpenseType} className="btn btn-secondary">新增</button></div><div className="flex flex-wrap gap-2">{safeSettings.expenseTypes.map(t=>(<span key={t} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{t} <button onClick={()=>removeExpenseType(t)} className="text-slate-400 hover:text-red-500 transition-colors"><X size={14}/></button></span>))}</div></div></div></div>
-    
-    {/* --- 雲端授權同步區塊 (帶有生成按鈕) --- */}
-<div className="card p-8 border-l-4 border-amber-500 mb-6">
-    <h3 className="font-bold text-xl mb-6 text-slate-800 flex items-center gap-2">
-        <Wifi size={24} className="text-amber-500"/> 雲端連動同步
-    </h3>
-    
-    <div className="space-y-4 mb-6">
-        <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">我的同步金鑰 (Sync Token)</label>
-            <div className="flex gap-2">
-                <input 
-                    className="input-field font-mono text-lg text-indigo-600 font-bold" 
-                    placeholder="請點擊右側按鈕生成鑰匙" 
-                    value={safeSettings.syncToken || ''} 
-                    onChange={e => setSettings({...safeSettings, syncToken: e.target.value.toUpperCase()})}
-                />
-                {/* 這是你要的自動生成按鈕 */}
-                <button 
-                    onClick={generateSyncToken} 
-                    className="btn btn-secondary whitespace-nowrap border-slate-300 shadow-sm"
-                >
-                    自動生成
-                </button>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-2">* 這串鑰匙就是你在雲端的「門牌號碼」，請務必記下來以便換設備時還原。</p>
-        </div>
-    </div>
-
-    <div className="flex gap-4">
-        <button onClick={syncToCloud} className="btn btn-primary flex-1 py-3 font-bold shadow-lg">
-            <Upload size={18}/> 上傳存檔
-        </button>
-        <button onClick={syncFromCloud} className="btn btn-secondary flex-1 py-3 font-bold">
-            <Download size={18}/> 還原下載
-        </button>
-    </div>
-</div>
    
     {/* --- 原有的：系統維護 --- */}
     <div className="card p-8"><h3 className="font-bold text-xl mb-6 text-slate-800">系統維護</h3><div className="flex gap-4 flex-wrap"><button onClick={exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button><label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={importBackup}/></label><button onClick={() => confirmAction('重置系統', '這將清空所有資料且無法復原！', () => { localStorage.clear(); window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button></div></div>
