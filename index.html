@@ -630,12 +630,14 @@ const handleUpdateOrder = (updatedOrder) => {
 
                         {/* 卡片式列表區域 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                            {filteredOrders.map(t => {
-                                const customer = safeCustomers.find(c => c.id === t.customerId);
-                                const gender = customer?.gender || '女'; 
-                                const isVip = (customer?.totalSpend || 0) > 10000;
+                         {filteredOrders.map(t => {
 
-                                // 讀取自訂顏色
+                        const customer = safeCustomers.find(c => c.id === t.customerId);
+                        // 優先讀取訂單上記錄的散客性別(customerGender)，如果找不到(代表舊會員訂單)，再去找會員資料夾裡的性別(gender)
+                        const gender = t.customerGender || customer?.gender || '女'; 
+                        const isVip = (customer?.totalSpend || 0) > 10000;
+                                
+                                 // 讀取自訂顏色
                                 const themeKey = safeSettings.genderColors[gender] || 'slate';
                                 const cardClass = getThemeClasses(themeKey, 'card_filled');
 
