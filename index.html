@@ -1318,32 +1318,36 @@ const handleUpdateOrder = (updatedOrder) => {
 
                 const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price - (item.discount||0)), 0), [cart]);
 
-                const addToCart = (service) => {
-                    if (service.isProduct && service.stock !== null) {
-                        const inCart = cart.filter(i => i.id === service.id).length;
-                        if ((service.stock - inCart) <= 0) { showToast('庫存不足！', 'error'); return; }
+const addToCart = (service) => {
+                         if (service.isProduct && service.stock !== null) {
+                              const inCart = cart.filter(i => i.id === service.id).length;
+                              if ((service.stock - inCart) <= 0) { showToast('庫存不足！', 'error'); return; }
+                         }
+                         const stylistObj = safeStylists.find(s => s.id === selectedStylist);
+                         const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
+                         
+                    // 【關鍵修正】：如果有點選會員，點擊商品加入時，強迫右側散客對話框填入會員名字，確保結帳單有名稱可依循
+                    if (selectedCustomer && !adHocCustomerName) {
+                        setAdHocCustomerName(selectedCustomer.name);
                     }
-                    const stylistObj = safeStylists.find(s => s.id === selectedStylist);
-                    const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
-                    
-                    setCart([...cart, { 
-                        cartId: generateId(), 
-                        id: service.id, 
-                        name: service.name, 
-                        price: service.price, 
-                        cost: service.cost || 0, 
-                        category: service.category, 
-                        stock: service.stock, 
-                        isProduct: service.isProduct, 
-                        stylistId: selectedStylist, 
-                        stylistName: stylistObj?.name || '未指定', 
-                        assistantId: selectedAssistant, 
-                        assistantName: assistantObj?.name || '', 
-                        isDesignated: true, 
-                        discount: 0 
-                    }]);
-                };
 
+                         setCart([...cart, { 
+                              cartId: generateId(), 
+                              id: service.id, 
+                              name: service.name, 
+                              price: service.price, 
+                              cost: service.cost || 0, 
+                              category: service.category, 
+                              stock: service.stock, 
+                              isProduct: service.isProduct, 
+                              stylistId: selectedStylist, 
+                              stylistName: stylistObj?.name || '未指定', 
+                              assistantId: selectedAssistant, 
+                              assistantName: assistantObj?.name || '', 
+                              isDesignated: true, 
+                              discount: 0 
+                         }]);
+                    };
                 const handlePendingOrder = () => {
                     if (cart.length === 0) return;
                     const custName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
@@ -1456,18 +1460,18 @@ const handleUpdateOrder = (updatedOrder) => {
                                         )}
 
                                         {filteredCustomers.length > 0 && (
-                                            <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                                                {filteredCustomers.map(c => (
-                                                    <div 
-                                                        key={c.id}
-                                                        onClick={() => { 
-                                                            setSelectedCustomer(c); 
-                                                            setAdHocCustomerName(c.name); // 將右側結帳單名字同步綁定為會員姓名
-                                                            setCustSearch(''); // 點擊後，左側輸入框立刻清空恢復乾淨
-                                                            showToast(`✅ 右側已完美連動：${c.name}`); 
-                                                        }}
-                                                        className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
-                                                    >                                                                        <div>
+                                                    <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                                            {filteredCustomers.map(c => (
+                                                                 <div 
+                                                                      key={c.id}
+                                                                      onClick={() => { 
+                                                                           setSelectedCustomer(c); 
+                                                                           setAdHocCustomerName(c.name); // 精準同步到右側開單頁面
+                                                                           setCustSearch(''); // 清空左側搜尋列
+                                                                           showToast(`✅ 右側已完美連動：${c.name}`); 
+                                                                      }}
+                                                                      className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
+                                                                 >                                                             <div>
                                                                             <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
                                                                             <span className="text-xs text-slate-400 font-mono block mt-0.5">{c.phone}</span>
                                                                         </div>
