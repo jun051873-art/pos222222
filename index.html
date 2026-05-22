@@ -332,13 +332,17 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
     if (!confirm(`確定要從 Firestore 還原嗎？\n這將覆蓋此裝置上的所有資料！`)) return;
 
     try {
+        showToast("正在從雲端下載...", "loading");
+        // 【關鍵修正】：Firestore 的下載路徑
         const url = `https://firestore.googleapis.com/v1/projects/${cloudKey.trim()}/databases/(default)/documents/SalonPOS/${syncToken.trim()}`;
+        
         const response = await fetch(url);
         const result = await response.json();
 
         if (result && result.fields && result.fields.content) {
+            // 解析回原本的 JSON 格式
             const data = JSON.parse(result.fields.content.stringValue);
-            // 恢復所有資料... (維持你原本的恢復邏輯)
+            
             if (data.services) setServices(data.services);
             if (data.stylists) setStylists(data.stylists);
             if (data.customers) setCustomers(data.customers);
@@ -350,29 +354,29 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             showToast("✅ 雲端還原成功！");
             setTimeout(() => window.location.reload(), 1000);
         } else {
-            showToast("❌ 雲端找不到資料", "error");
+            showToast("❌ 雲端找不到資料，請確認金鑰", "error");
         }
     } catch (err) {
-        showToast("讀取失敗，請檢查 ID 或網路", "error");
+        showToast("讀取失敗，請檢查網路", "error");
     }
 };
-   // --- 4. 雲端備份邏輯 (Firestore 台灣機房專用版) ---
+  // --- 4. 雲端備份邏輯 (Firestore 台灣機房專用版) ---
 const syncToCloud = async () => {
+    // 這裡會抓取你在設定頁面「確認」後存進去的 cloudKey
     const { cloudKey, syncToken } = settings;
 
-    if (!cloudKey || !syncToken) {
-        showToast("請先設定 Firebase ID 與金鑰", "error");
+    // 檢查有沒有填 ID，沒填就不能建立
+    if (!cloudKey || !syncToken || cloudKey === '你的Firebase專案ID') {
+        showToast("請先在設定填寫正確的 Firebase ID 並按確認", "error");
         return;
     }
 
     try {
-        showToast("雲端同步中 (Firestore)...", "loading");
+        showToast("正在建立雲端空間並同步...", "loading");
         
-        // Firestore REST API 格式：不需要 .json，路徑是固定的文檔路徑
-        // 這會直接在 SalonPOS 集合下，建立以你的金鑰為名的 Document
+        // Firestore 自動建立的關鍵：路徑指向 /SalonPOS/你的金鑰
         const url = `https://firestore.googleapis.com/v1/projects/${cloudKey.trim()}/databases/(default)/documents/SalonPOS/${syncToken.trim()}?updateMask.fieldPaths=content`;
         
-        // Firestore 規定必須包裹在 fields 裡面，且指定型別 (stringValue)
         const backupData = {
             fields: {
                 content: {
@@ -391,17 +395,18 @@ const syncToCloud = async () => {
         };
 
         const response = await fetch(url, {
-            method: 'PATCH', // 使用 PATCH 配合 updateMask 可以強制創建或更新
+            method: 'PATCH', // 自動建立資料夾的關鍵動詞
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(backupData)
         });
 
         if (response.ok) {
-            showToast("✅ Firestore 備份成功 (台灣)");
+            showToast("✅ 雲端空間已建立並備份成功！");
         } else {
             const err = await response.json();
             console.error("Firestore Error:", err);
-            // 這裡如果報錯 403，通常是 Firestore 的 Rules 沒開
-            showToast(`❌ 失敗: ${err.error.status}`, "error");
+            // 這裡如果失敗，通常是 Rules 沒開 (403) 或 ID 打錯 (404)
+            showToast(`❌ 失敗: ${err.error?.status || '請檢查ID與規則'}`, "error");
         }
     } catch (err) {
         console.error("Network Error:", err);
@@ -1544,225 +1549,337 @@ const handleCheckout = (paymentMethod) => {
             };
 
 const SettingsView = () => {
-                const [categoryInput, setCategoryInput] = useState('');
-                const [expenseTypeInput, setExpenseTypeInput] = useState('');
-                const [isEditingItem, setIsEditingItem] = useState(false);
-                const [itemForm, setItemForm] = useState({});
-                const [itemSearch, setItemSearch] = useState('');
+    const [categoryInput, setCategoryInput] = useState('');
+    const [expenseTypeInput, setExpenseTypeInput] = useState('');
+    const [isEditingItem, setIsEditingItem] = useState(false);
+    const [itemForm, setItemForm] = useState({});
+    const [itemSearch, setItemSearch] = useState(''); // 新增：項目搜尋字串狀態
 
-                // --- 核心優化：建立區域狀態防止打字閃跳 ---
-                const [localCloudKey, setLocalCloudKey] = useState(settings.cloudKey || '');
-                const [localSyncToken, setLocalSyncToken] = useState(settings.syncToken || '');
+    // --- 核心修正：Firebase 專案 ID 鎖定，確保備份路徑正確 ---
+    const DEFAULT_PROJECT_ID = "salonpos-system";
+    // --- 區域狀態防止輸入時介面跳動 ---
+    const [localShopID, setLocalShopID] = useState(settings.shopID || '');
+    const [localSyncToken, setLocalSyncToken] = useState(settings.syncToken || '');
 
-                // 當外部 settings 更新時（例如從雲端下載後），同步回區域狀態
-                useEffect(() => {
-                    setLocalCloudKey(settings.cloudKey || '');
-                    setLocalSyncToken(settings.syncToken || '');
-                }, [settings.cloudKey, settings.syncToken]);
+    // 當從雲端還原後，更新同步回輸入框
+    useEffect(() => {
+        setLocalShopID(settings.shopID || '');
+        setLocalSyncToken(settings.syncToken || '');
+    }, [settings.shopID, settings.syncToken]);
 
-                // 處理打字：只更新區域狀態，絕對不觸發頂層 setSettings
-                const handleCloudIdInput = (e) => setLocalCloudKey(e.target.value);
-                const handleTokenInput = (e) => setLocalSyncToken(e.target.value);
+    // 儲存連動設定
+    const saveCloudSettings = () => {
+        setSettings(prev => ({
+            ...prev,
+            shopID: localShopID.trim(),
+            cloudKey: DEFAULT_PROJECT_ID,
+            syncToken: localSyncToken.trim()
+        }));
+    };
 
-                // 失去焦點 (onBlur) 時才把資料寫回大系統
-                const syncToGlobal = () => {
-                    setSettings(prev => ({
-                        ...prev,
-                        cloudKey: localCloudKey,
-                        syncToken: localSyncToken
-                    }));
-                };
+    // --- 雲端備份邏輯：自動根據「店號」建立路徑 ---
+    const syncToCloud = async () => {
+        const shopID = localShopID.trim();
+        const syncToken = localSyncToken.trim();
 
-                const addCategory = () => { if(categoryInput && !safeSettings.categories.includes(categoryInput)) { setSettings({...safeSettings, categories: [...safeSettings.categories, categoryInput]}); setCategoryInput(''); } };
-                const addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings({...safeSettings, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]}); setExpenseTypeInput(''); } };
-                const removeCategory = (cat) => setSettings({...safeSettings, categories: safeSettings.categories.filter(c=>c!==cat)});
-                const removeExpenseType = (type) => setSettings({...safeSettings, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)});
-                
-                const exportBackup = () => {
-                    try {
-                        const backupData = { services: safeServices, stylists: safeStylists, customers: safeCustomers, transactions: safeTransactions, settings: safeSettings, inventoryLogs: safeInventoryLogs, expenses: safeExpenses };
-                        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a'); link.href = url; link.download = `salon_backup_${getCurrentDateLocal()}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); showToast('備份下載已啟動');
-                    } catch (error) { console.error(error); alert('備份失敗'); }
-                };
+        if (!shopID || !syncToken) {
+            showToast("請輸入店號並生成金鑰", "error");
+            return;
+        }
 
-                const importBackup = (event) => {
-                    const fileReader = new FileReader();
-                    if (!event.target.files[0]) return;
-                    fileReader.readAsText(event.target.files[0], "UTF-8");
-                    fileReader.onload = async (e) => {
-                        try {
-                            const parsed = JSON.parse(e.target.result);
-                            if (confirm('確定要「還原舊檔案」嗎？\n這將覆蓋目前的本機資料。')) {
-                                const dataMap = { 'salon_services': parsed.services || [], 'salon_stylists': parsed.stylists || [], 'salon_customers': parsed.customers || [], 'salon_transactions': parsed.transactions || [], 'salon_expenses': parsed.expenses || [], 'salon_settings': parsed.settings || {}, 'salon_inventory_logs': parsed.inventoryLogs || [] };
-                                Object.entries(dataMap).forEach(([key, val]) => { localStorage.setItem(key, JSON.stringify(val)); });
-                                alert('資料還原成功，系統即將重新整理');
-                                window.location.reload(); 
-                            }
-                        } catch (err) { alert('檔案讀取失敗，請確認是否為正確的 JSON 備份檔'); }
-                    };
-                }; 
-
-                const handleSaveItem = () => {
-                    if (!itemForm.name || !itemForm.price) { alert('請輸入名稱與價格'); return; }
-                    const newItem = { ...itemForm, price: Number(itemForm.price), cost: Number(itemForm.cost || 0), stock: itemForm.isProduct ? (itemForm.stock !== null ? itemForm.stock : 0) : null };
-                    if (newItem.id) setServices(safeServices.map(s => s.id === newItem.id ? newItem : s));
-                    else setServices([...safeServices, { ...newItem, id: generateId() }]);
-                    setIsEditingItem(false); setItemForm({}); showToast('項目已儲存');
-                };
-
-                const handleDeleteItem = (id) => {
-                    confirmAction('刪除項目', '確定刪除？這不會影響歷史訂單，但此項目將不再顯示於開單列表。', () => {
-                        setServices(safeServices.filter(s => s.id !== id)); showToast('項目已刪除');
-                    });
-                };
-
-                const filteredServices = safeServices.filter(s => s.name.includes(itemSearch) || s.category.includes(itemSearch));
-                const allRoles = [...new Set(safeStylists.map(s => s.role || '設計師')), '店長', '設計師', '助理'];
-
-                return (
-                    <div className="p-6 md:p-10 h-full overflow-y-auto max-w-6xl mx-auto space-y-8 pb-32">
-                        {/* 1. 外觀色彩設定 */}
-                        <div className="card p-8 border-l-4 border-indigo-500">
-                            <h3 className="font-bold text-xl mb-6 text-slate-800 flex items-center gap-2"><Palette size={24} className="text-indigo-500"/> 外觀色彩設定 (Color Themes)</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">顧客性別標示顏色 (男/女/兒童)</h4><div className="space-y-3">{Object.keys(safeSettings.genderColors).map(gender => (<div key={gender} className="flex justify-between items-center"><span className="font-bold text-slate-700">{gender}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.genderColors[gender] || 'slate'} onChange={e => setSettings({...safeSettings, genderColors: {...safeSettings.genderColors, [gender]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
-                                <div><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">人員職位標示顏色</h4><div className="space-y-3">{allRoles.filter((v,i,a)=>a.indexOf(v)===i).map(role => (<div key={role} className="flex justify-between items-center"><span className="font-bold text-slate-700">{role}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.roleColors[role] || 'slate'} onChange={e => setSettings({...safeSettings, roleColors: {...safeSettings.roleColors, [role]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
-                                <div className="md:col-span-2"><h4 className="text-sm font-bold text-slate-500 mb-3 border-b pb-2">服務分類卡片顏色</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">{safeSettings.categories.map(cat => (<div key={cat} className="flex justify-between items-center"><span className="font-bold text-slate-700">{cat}</span><select className="input-field w-40 text-xs font-bold" value={safeSettings.categoryColors[cat] || 'slate'} onChange={e => setSettings({...safeSettings, categoryColors: {...safeSettings.categoryColors, [cat]: e.target.value}})}>{Object.keys(COLOR_THEMES).map(k => <option key={k} value={k}>{COLOR_THEMES[k].label}</option>)}</select></div>))}</div></div>
-                            </div>
-                        </div>
-
-                        {/* 2. 價目表與商品管理 */}
-                        <div className="card p-8">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"><div><h3 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Tag size={24} className="text-indigo-500"/> 價目表與商品管理</h3><p className="text-sm text-slate-500 mt-1">設定服務項目、價格、成本與庫存商品</p></div><div className="flex gap-2 w-full md:w-auto"><div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input className="input-field pl-10 py-2" placeholder="搜尋項目..." value={itemSearch} onChange={e=>setItemSearch(e.target.value)}/></div><button onClick={()=>{setItemForm({category: safeSettings.categories[0], isProduct: false, price: 0, cost: 0}); setIsEditingItem(true);}} className="btn btn-primary whitespace-nowrap"><Plus size={18}/> 新增項目</button></div></div>
-                            <div className="overflow-x-auto border rounded-xl"><table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 border-b font-bold text-slate-600"><tr><th className="p-4">類別</th><th className="p-4">名稱</th><th className="p-4 text-right">售價</th><th className="p-4 text-right">成本</th><th className="p-4 text-center">庫存管理</th><th className="p-4 text-center">操作</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredServices.map(s => (<tr key={s.id} className="hover:bg-slate-50"><td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">{s.category}</span></td><td className="p-4 font-bold text-slate-700">{s.name}</td><td className="p-4 text-right font-bold text-indigo-600">{formatCurrency(s.price)}</td><td className="p-4 text-right text-slate-500">{s.cost>0?formatCurrency(s.cost):'-'}</td><td className="p-4 text-center">{s.isProduct?<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold">已啟用 (存: {s.stock})</span>:<span className="text-xs text-slate-400">-</span>}</td><td className="p-4 text-center flex justify-center gap-2"><button onClick={()=>{setItemForm(s); setIsEditingItem(true);}} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={16}/></button><button onClick={()=>handleDeleteItem(s.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button></td></tr>))}{filteredServices.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400">無符合項目</td></tr>}</tbody></table></div>
-                        </div>
-
-                        {/* 3. 雲端授權與同步 (優化版：絕不閃跳) */}
-                        <div className="card p-8 border-l-4 border-amber-500 shadow-md">
-                            <h3 className="font-bold text-xl mb-6 text-slate-800 flex items-center gap-2"><Wifi size={24} className="text-amber-500"/> 雲端授權與同步 (台灣伺服器)</h3>
-                            <div className="space-y-4 mb-6">
-<div>
-    <label className="text-xs font-bold text-slate-500 mb-1 block">雲端伺服器鑰匙 (Firebase ID)</label>
-    <div className="flex gap-2">
-        <input 
-            className="input-field font-mono bg-white flex-1" 
-            placeholder="請輸入 Firebase 專案 ID" 
-            value={localCloudKey} 
-            onChange={handleCloudIdInput}
-        />
-        {/* 新增：確認儲存按鈕 */}
-        <button 
-            onClick={() => { syncToGlobal(); showToast("ID 已鎖定儲存"); }}
-            className="btn btn-secondary px-4 bg-slate-800 text-white hover:bg-black"
-        >
-            確認
-        </button>
-    </div>
-</div>
-<div>
-    <label className="text-xs font-bold text-slate-500 mb-1 block">我的金鑰 (Sync Token)</label>
-    <div className="flex gap-2">
-        <input 
-            className="input-field font-mono text-lg text-indigo-600 font-bold bg-white flex-1" 
-            placeholder="點擊生成或手動輸入" 
-            value={localSyncToken} 
-            onChange={handleTokenInput}
-        />
-        <button 
-            onClick={() => { syncToGlobal(); showToast("金鑰已儲存"); }}
-            className="btn btn-secondary px-4 bg-slate-800 text-white hover:bg-black"
-        >
-            儲存
-        </button>
-        <button onClick={(e) => { e.preventDefault(); generateSyncToken(); }} className="btn btn-secondary whitespace-nowrap">自動生成</button>
-    </div>
-</div>                            </div>
-                            <div className="flex gap-4">
-                                <button onClick={syncToCloud} className="btn btn-primary flex-1 py-3 font-bold shadow-lg"><Upload size={18}/> 立即備份 (上傳)</button>
-                                <button onClick={syncFromCloud} className="btn btn-secondary flex-1 py-3 font-bold"><Download size={18}/> 恢復資料 (下載)</button>
-                            </div>
-                        </div>
-
-                        {/* 4. 抽成規則 */}
-                        <div className="card p-8">
-                            <h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3>
-                            <label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>setSettings({...safeSettings, deductCostBeforeCommission:e.target.checked})} className="w-5 h-5 accent-indigo-600"/> 
-                                <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span>
-                            </label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                {safeSettings.categories.map(c=>(
-                                    <div key={c} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                        <div className="text-xs font-bold text-slate-400 mb-2">{c} (%)</div>
-                                        <input type="number" className="w-full bg-transparent font-black text-xl border-b border-slate-300 text-center outline-none" value={safeSettings.commissionRates[c]||0} onChange={e=>{const newRates={...safeSettings.commissionRates,[c]:Number(e.target.value)}; setSettings({...safeSettings, commissionRates:newRates})}}/>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 5. 分類管理 */}
-                        <div className="card p-8">
-                            <h3 className="font-bold text-xl mb-6 text-slate-800">分類管理</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-500 mb-3">服務/商品分類</h4>
-                                    <div className="flex gap-3 mb-4">
-                                        <input className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/>
-                                        <button onClick={addCategory} className="btn btn-secondary">新增</button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">{safeSettings.categories.map(c=>(<span key={c} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{c} <button onClick={()=>removeCategory(c)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-500 mb-3">支出項目分類</h4>
-                                    <div className="flex gap-3 mb-4">
-                                        <input className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/>
-                                        <button onClick={addExpenseType} className="btn btn-secondary">新增</button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">{safeSettings.expenseTypes.map(t=>(<span key={t} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{t} <button onClick={()=>removeExpenseType(t)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 6. 系統維護 */}
-                        <div className="card p-8">
-                            <h3 className="font-bold text-xl mb-6 text-slate-800">系統維護</h3>
-                            <div className="flex gap-4 flex-wrap">
-                                <button onClick={exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button>
-                                <label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={importBackup}/></label>
-                                <button onClick={() => confirmAction('重置系統', '這將清空所有資料！', () => { localStorage.clear(); window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button>
-                            </div>
-                        </div>
-
-                        {/* 編輯項目的彈出視窗 */}
-                        {isEditingItem && (
-                            <Modal title={itemForm.id ? '編輯項目' : '新增項目'} onClose={()=>setIsEditingItem(false)}>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">名稱</label><input className="input-field" value={itemForm.name||''} onChange={e=>setItemForm({...itemForm, name: e.target.value})} placeholder="例如: 洗髮精"/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">分類</label><select className="input-field" value={itemForm.category} onChange={e=>setItemForm({...itemForm, category: e.target.value})}>{safeSettings.categories.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">售價</label><input type="number" className="input-field" value={itemForm.price||0} onChange={e=>setItemForm({...itemForm, price: e.target.value})}/></div>
-                                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">成本 (計算利潤用)</label><input type="number" className="input-field" value={itemForm.cost||0} onChange={e=>setItemForm({...itemForm, cost: e.target.value})}/></div>
-                                    </div>
-                                    <div className="border-t pt-4 mt-2">
-                                        <label className="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                                            <input type="checkbox" className="w-5 h-5 accent-indigo-600" checked={itemForm.isProduct||false} onChange={e=>setItemForm({...itemForm, isProduct: e.target.checked})}/>
-                                            <div>
-                                                <div className="font-bold text-slate-700">啟用庫存管理</div>
-                                                <div className="text-xs text-slate-500">勾選後此項目將出現在「庫存頁面」</div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <button onClick={handleSaveItem} className="btn btn-primary w-full py-3 mt-2 shadow-md">儲存項目</button>
-                                </div>
-                            </Modal>
-                        )}
-                    </div>
-                );
+        try {
+            showToast(`正在連線並建立 [${shopID}] 空間...`, "loading");
+            const url = `https://firestore.googleapis.com/v1/projects/${DEFAULT_PROJECT_ID}/databases/(default)/documents/SalonPOS/${shopID}/Tokens/${syncToken}?updateMask.fieldPaths=content`;
+            
+            const backupData = {
+                fields: {
+                    content: {
+                        stringValue: JSON.stringify({
+                            services: safeServices, 
+                            stylists: safeStylists, 
+                            customers: safeCustomers, 
+                            transactions: safeTransactions, 
+                            settings: { ...safeSettings, shopID, syncToken, cloudKey: DEFAULT_PROJECT_ID }, 
+                            inventoryLogs: safeInventoryLogs, 
+                            expenses: safeExpenses,
+                            lastUpdated: new Date().toISOString()
+                        })
+                    }
+                }
             };
+
+            const response = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(backupData)
+            });
+
+            if (response.ok) {
+                saveCloudSettings();
+                showToast(`✅ 店號 [${shopID}] 備份成功！`);
+            } else {
+                showToast("❌ 連線失敗，請檢查網路或專案權限", "error");
+            }
+        } catch (err) {
+            showToast("❌ 雲端伺服器異常", "error");
+        }
+    };
+
+    // --- 雲端下載還原邏輯 ---
+    const syncFromCloud = async () => {
+        const shopID = localShopID.trim();
+        const syncToken = localSyncToken.trim();
+        
+        if (!shopID || !syncToken) {
+            showToast("請填寫店號與金鑰", "error");
+            return;
+        }
+
+        if (!confirm(`確定要從雲端還原 [${shopID}] 的資料嗎？`)) return;
+
+        try {
+            showToast("下載同步中...", "loading");
+            const url = `https://firestore.googleapis.com/v1/projects/${DEFAULT_PROJECT_ID}/databases/(default)/documents/SalonPOS/${shopID}/Tokens/${syncToken}`;
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result && result.fields && result.fields.content) {
+                const data = JSON.parse(result.fields.content.stringValue);
+                if (data.services) setServices(data.services);
+                if (data.stylists) setStylists(data.stylists);
+                if (data.customers) setCustomers(data.customers);
+                if (data.transactions) setTransactions(data.transactions);
+                if (data.expenses) setExpenses(data.expenses);
+                if (data.settings) setSettings(data.settings);
+                if (data.inventoryLogs) setInventoryLogs(data.inventoryLogs);
+                
+                showToast("✅ 資料還原成功");
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast("❌ 找不到資料，請確認店號是否正確", "error");
+            }
+        } catch (err) {
+            showToast("讀取失敗", "error");
+        }
+    };
+
+    const addCategory = () => { if(categoryInput && !safeSettings.categories.includes(categoryInput)) { setSettings({...safeSettings, categories: [...safeSettings.categories, categoryInput]}); setCategoryInput(''); } };
+    const addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings({...safeSettings, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]}); setExpenseTypeInput(''); } };
+    const removeCategory = (cat) => setSettings({...safeSettings, categories: safeSettings.categories.filter(c=>c!==cat)});
+    const removeExpenseType = (type) => setSettings({...safeSettings, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)});
+    
+    const exportBackup = () => {
+        try {
+            const backupData = { services: safeServices, stylists: safeStylists, customers: safeCustomers, transactions: safeTransactions, settings: safeSettings, inventoryLogs: safeInventoryLogs, expenses: safeExpenses };
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a'); link.href = url; link.download = `salon_backup_${getCurrentDateLocal()}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); showToast('備份下載已啟動');
+        } catch (error) { console.error(error); alert('備份失敗'); }
+    };
+
+    const importBackup = (event) => {
+        const fileReader = new FileReader();
+        if (!event.target.files[0]) return;
+        fileReader.readAsText(event.target.files[0], "UTF-8");
+        fileReader.onload = async (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (confirm('確定要「還原舊檔案」嗎？')) {
+                    const dataMap = { 'salon_services': parsed.services || [], 'salon_stylists': parsed.stylists || [], 'salon_customers': parsed.customers || [], 'salon_transactions': parsed.transactions || [], 'salon_expenses': parsed.expenses || [], 'salon_settings': parsed.settings || {}, 'salon_inventory_logs': parsed.inventoryLogs || [] };
+                    Object.entries(dataMap).forEach(([key, val]) => { localStorage.setItem(key, JSON.stringify(val)); });
+                    alert('資料還原成功');
+                    window.location.reload(); 
+                }
+            } catch (err) { alert('檔案讀取失敗'); }
+        };
+    }; 
+
+    const handleSaveItem = () => {
+        if (!itemForm.name || !itemForm.price) { alert('請輸入名稱與價格'); return; }
+        const newItem = { ...itemForm, price: Number(itemForm.price), cost: Number(itemForm.cost || 0), stock: itemForm.isProduct ? (itemForm.stock !== null ? itemForm.stock : 0) : null };
+        if (newItem.id) setServices(safeServices.map(s => s.id === newItem.id ? newItem : s));
+        else setServices([...safeServices, { ...newItem, id: generateId() }]);
+        setIsEditingItem(false); setItemForm({}); showToast('項目已儲存');
+    };
+
+    const handleDeleteItem = (id) => {
+        confirmAction('刪除項目', '確定刪除？', () => {
+            setServices(safeServices.filter(s => s.id !== id)); showToast('項目已刪除');
+        });
+    };
+
+    // 篩選出符合搜尋條件的服務或產品項目
+    const filteredItemList = safeServices.filter(s => s.name.includes(itemSearch) || s.category.includes(itemSearch));
+
+    return (
+        <div className="p-6 md:p-10 h-full overflow-y-auto max-w-6xl mx-auto space-y-8 pb-32">
+            
+            {/* 雲端自動連動區塊 */}
+            <div className="card p-8 border-l-4 border-amber-500 shadow-md">
+                <h3 className="font-bold text-xl mb-4 text-slate-800 flex items-center gap-2">
+                    <Wifi size={24} className="text-amber-500"/> 雲端自動同步設定
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第一步：設定客戶店號 (Shop ID)</label>
+                        <input 
+                            className="input-field font-bold text-lg bg-white border-2 border-slate-200" 
+                            placeholder="例如: SpecialSpace_A" 
+                            value={localShopID} 
+                            onChange={(e) => setLocalShopID(e.target.value)}
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">※ 相同店號的資料會存於同一個雲端資料夾</p>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第二步：生成同步金鑰 (Sync Token)</label>
+                        <div className="flex gap-2">
+                            <input 
+                                className="input-field font-mono text-lg text-indigo-600 font-bold bg-slate-50 flex-1" 
+                                readOnly
+                                placeholder="點擊自動生成" 
+                                value={localSyncToken} 
+                            />
+                            <button onClick={(e) => { e.preventDefault(); generateSyncToken(); }} className="btn btn-secondary whitespace-nowrap bg-slate-800 text-white">自動生成</button>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <button onClick={syncToCloud} className="btn btn-primary flex-1 py-4 font-bold shadow-lg text-lg">
+                        <Upload size={20}/> 建立空間並備份
+                    </button>
+                    <button onClick={syncFromCloud} className="btn btn-secondary flex-1 py-4 font-bold text-lg">
+                        <Download size={20}/> 下載恢復資料
+                    </button>
+                </div>
+            </div>
+
+            {/* 新增：營業項目管理列表（讓原本沒標題沒列表的代碼重獲新生） */}
+            <div className="card p-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                        <h3 className="font-bold text-xl text-slate-800">營業項目管理</h3>
+                        <p className="text-xs text-slate-400 mt-1">管理店內提供之洗剪染燙服務及販售之實體產品</p>
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-48">
+                            <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                            <input className="input-field pl-10 py-1.5 text-sm" placeholder="搜尋項目..." value={itemSearch} onChange={e=>setItemSearch(e.target.value)}/>
+                        </div>
+                        <button onClick={() => { setItemForm({ category: safeSettings.categories[0] || '', price: '', cost: '', isProduct: false }); setIsEditingItem(true); }} className="btn btn-primary text-sm whitespace-nowrap"><Plus size={16}/> 新增項目</button>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto border rounded-xl">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-slate-50 border-b text-slate-500 font-bold">
+                            <tr>
+                                <th className="p-4">項目名稱</th>
+                                <th className="p-4">分類</th>
+                                <th className="p-4 text-right">售價</th>
+                                <th className="p-4 text-right">成本</th>
+                                <th className="p-4 text-center">庫存管理</th>
+                                <th className="p-4 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredItemList.map(item => (
+                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-4 font-bold text-slate-800">{item.name}</td>
+                                    <td className="p-4"><span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold">{item.category}</span></td>
+                                    <td className="p-4 text-right font-bold text-slate-700">${item.price}</td>
+                                    <td className="p-4 text-right text-slate-500">${item.cost || 0}</td>
+                                    <td className="p-4 text-center">{item.isProduct ? <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">啟用 (實體商品)</span> : <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs font-bold">現場服務</span>}</td>
+                                    <td className="p-4 text-center">
+                                        <div className="flex justify-center gap-1">
+                                            <button onClick={() => { setItemForm(item); setIsEditingItem(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={16}/></button>
+                                            <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredItemList.length === 0 && (
+                                <tr><td colSpan="6" className="p-8 text-center text-slate-400">尚未建立任何服務或商品項目</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* 抽成規則 */}
+            <div className="card p-8">
+                <h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3>
+                <label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                    <input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>setSettings({...safeSettings, deductCostBeforeCommission:e.target.checked})} className="w-5 h-5 accent-indigo-600"/> 
+                    <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span>
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {safeSettings.categories.map(c=>(
+                        <div key={c} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="text-xs font-bold text-slate-400 mb-2">{c} (%)</div>
+                            <input type="number" className="w-full bg-transparent font-black text-xl border-b border-slate-300 text-center outline-none" value={safeSettings.commissionRates[c]||0} onChange={e=>{const newRates={...safeSettings.commissionRates,[c]:Number(e.target.value)}; setSettings({...safeSettings, commissionRates:newRates})}}/>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* 分類管理 */}
+            <div className="card p-8">
+                <h3 className="font-bold text-xl mb-6 text-slate-800">分類管理</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 className="text-sm font-bold text-slate-500 mb-3">服務/商品分類</h4>
+                        <div className="flex gap-3 mb-4">
+                            <input className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/>
+                            <button onClick={addCategory} className="btn btn-secondary">新增</button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">{safeSettings.categories.map(c=>(<span key={c} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{c} <button onClick={()=>removeCategory(c)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-slate-500 mb-3">支出項目分類</h4>
+                        <div className="flex gap-3 mb-4">
+                            <input className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/>
+                            <button onClick={addExpenseType} className="btn btn-secondary">新增</button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">{safeSettings.expenseTypes.map(t=>(<span key={t} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{t} <button onClick={()=>removeExpenseType(t)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 系統維護 */}
+            <div className="card p-8">
+                <h3 className="font-bold text-xl mb-6 text-slate-800">系統維護</h3>
+                <div className="flex gap-4 flex-wrap">
+                    <button onClick={exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button>
+                    <label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={importBackup}/></label>
+                    <button onClick={() => confirmAction('重置系統', '這將清空所有資料！', () => { localStorage.clear(); window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button>
+                </div>
+            </div>
+
+            {/* 項目彈出視窗（只在點擊編輯/新增時浮現在正中央） */}
+            {isEditingItem && (
+                <Modal title={itemForm.id ? '編輯項目' : '新增項目'} onClose={()=>setIsEditingItem(false)}>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">名稱</label><input className="input-field shadow-sm bg-white" value={itemForm.name||''} onChange={e=>setItemForm({...itemForm, name: e.target.value})} placeholder="例如: 洗髮精"/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">分類</label><select className="input-field shadow-sm bg-white" value={itemForm.category} onChange={e=>setItemForm({...itemForm, category: e.target.value})}>{safeSettings.categories.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">售價</label><input type="number" className="input-field shadow-sm bg-white" value={itemForm.price||0} onChange={e=>setItemForm({...itemForm, price: e.target.value})}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">成本</label><input type="number" className="input-field shadow-sm bg-white" value={itemForm.cost||0} onChange={e=>setItemForm({...itemForm, cost: e.target.value})}/></div>
+                        </div>
+                        <div className="border-t pt-4 mt-2">
+                            <label className="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                                <input type="checkbox" className="w-5 h-5 accent-indigo-600" checked={itemForm.isProduct||false} onChange={e=>setItemForm({...itemForm, isProduct: e.target.checked})}/>
+                                <div><div className="font-bold text-slate-700">啟用庫存管理</div></div>
+                            </label>
+                        </div>
+                        <button onClick={handleSaveItem} className="btn btn-primary w-full py-4 mt-2 shadow-md">儲存項目</button>
+                    </div>
+                </Modal>
+            )}
+        </div>
+    );
+};         
             return (
                 <div className="flex h-screen overflow-hidden bg-slate-100">
                     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
@@ -1772,58 +1889,58 @@ const SettingsView = () => {
                         </nav>                 
                         <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.0 Ultimate</div>
                     </aside>
-                    {/* 1. 手機版全螢幕選單 */}
-            {isMobileMenuOpen && (
-                <div className="lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
-                    <div className="flex justify-between items-center py-6 border-b border-white/10">
-                        <div className="font-bold text-xl">系統選單</div>
-                        <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X size={32}/></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto pt-4 pb-10">
-                        {[ 
-                            {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
-                            {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'} 
-                        ].map(item => (
-                            <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
-                        ))}
-                        
-                    </div>
-                </div>
-            )}
+                    
+                    {/* 手機版全螢幕選單 */}
+                    {isMobileMenuOpen && (
+                        <div className="lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
+                            <div className="flex justify-between items-center py-6 border-b border-white/10">
+                                <div className="font-bold text-xl">系統選單</div>
+                                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X size={32}/></button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto pt-4 pb-10">
+                                {[ 
+                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
+                                    {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'} 
+                                ].map(item => (
+                                    <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-            {/* 2. 主內容區：pt-[env(safe-area-inset-top)] 解決 iPhone 點不到頂部問題 */}
-            <main className="flex-1 w-full h-screen overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top)]">
-                {/* 手機版頂欄 */}
-                <div className="lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
-                    <div className="font-bold flex items-center gap-2 text-slate-800">
-                        <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
-                    </div>
-                    <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg active:bg-slate-200"><Menu size={24}/></button>
-                </div>
+                    {/* 主內容區 */}
+                    <main className="flex-1 w-full h-screen overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top)]">
+                        {/* 手機版頂欄 */}
+                        <div className="lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
+                            <div className="font-bold flex items-center gap-2 text-slate-800">
+                                <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
+                            </div>
+                            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg active:bg-slate-200"><Menu size={24}/></button>
+                        </div>
 
-                <div className="flex-1 overflow-auto bg-slate-50">
-                    {activeTab === 'pos' && <POSView />}
-                    {activeTab === 'orders' && <OrderView />}
-                    {activeTab === 'report' && <ReportView />}
-                    {activeTab === 'customers' && <CustomerView />}
-                    {activeTab === 'staff' && <StaffView />}
-                    {activeTab === 'inventory' && <InventoryView />}
-                    {activeTab === 'settings' && <SettingsView />}
-                </div>
-            </main>
+                        <div className="flex-1 overflow-auto bg-slate-50">
+                            {activeTab === 'pos' && <POSView />}
+                            {activeTab === 'orders' && <OrderView />}
+                            {activeTab === 'report' && <ReportView />}
+                            {activeTab === 'customers' && <CustomerView />}
+                            {activeTab === 'staff' && <StaffView />}
+                            {activeTab === 'inventory' && <InventoryView />}
+                            {activeTab === 'settings' && <SettingsView />}
+                        </div>
+                    </main>
 
-            <ConfirmModal {...confirmDialog} />
-            {notification && (
-                <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-fade-in text-white font-bold flex items-center gap-2 whitespace-nowrap ${notification.type==='error'?'bg-red-500':'bg-slate-800'}`}>
-                    {notification.type==='error'?<X size={20}/>:<CheckCircle size={20}/>} {notification.msg}
+                    <ConfirmModal {...confirmDialog} />
+                    {notification && (
+                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-fade-in text-white font-bold flex items-center gap-2 whitespace-nowrap ${notification.type==='error'?'bg-red-500':'bg-slate-800'}`}>
+                            {notification.type==='error'?<X size={20}/>:<CheckCircle size={20}/>} {notification.msg}
+                        </div>
+                    )}
                 </div>
-            )}
-        </div>
-    );
-}
+            );
+        }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<HairSalonApp />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<HairSalonApp />);
     </script>
 </body>
 </html>
