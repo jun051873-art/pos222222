@@ -1,4 +1,4 @@
-」<!DOCTYPE html><html lang="zh-TW">
+<!DOCTYPE html><html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1623,111 +1623,6 @@ const handleUpdateOrder = (updatedOrder) => {
                                 <div className="flex gap-2"><button onClick={handlePendingOrder} disabled={cart.length === 0} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50">掛單</button><button onClick={() => setShowCheckout(true)} disabled={cart.length === 0} className="flex-[2] btn-primary py-3 rounded-xl font-bold shadow-lg disabled:opacity-50">結帳收款</button></div>
                             </div>
                         </div>
-                    </div>
-                );
-            };
-                        {/* --- 右側面板：持續性連動顯示卡片區 --- */}
-                        <div className="w-full lg:w-96 bg-white rounded-2xl shadow-xl flex flex-col h-[45vh] lg:h-full border border-slate-200">
-                            <div className="p-4 border-b flex justify-between items-center bg-slate-50/50">
-                                <span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span>
-                                <div className="flex gap-2">
-                                    <button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button>
-                                    <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span>
-                                </div>
-                            </div>
-                            
-                          {/* 刀哥專屬：右側持續性顧客連動卡片顯示區（真正生效區） */}
-<div className="px-4 pt-3">
-    <label className="text-xs font-bold text-slate-400 mb-1 block">當前開單顧客</label>
-    
-    {selectedCustomer ? (
-        /* 情況 A：百分之百強制顯示選中的正式會員名字與電話 */
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 p-3 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
-            <div>
-                <div className="font-black text-indigo-900 flex items-center gap-1.5 text-base">
-                    👤 {selectedCustomer.name} 
-                    <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-md font-bold">已連動會員</span>
-                </div>
-                <div className="text-xs text-indigo-500 font-mono mt-0.5">📱 {selectedCustomer.phone || '無電話紀錄'}</div>
-            </div>
-            <button 
-                type="button"
-                onClick={() => { 
-                    setSelectedCustomer(null); 
-                    setAdHocCustomerName(''); 
-                    showToast('已解除會員連動'); 
-                }} 
-                className="p-1 text-slate-400 hover:text-red-500 rounded-full transition-all"
-                title="解除連動"
-            >
-                ✕
-            </button>
-        </div>
-    ) : (
-        /* 情況 B：沒有正式會員，才顯示輸入的散客名字或現場單 */
-        <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
-            <div>
-                <div className="font-bold text-slate-700 text-sm">
-                    {adHocCustomerName && adHocCustomerName.trim() ? `🚶 散客開單：${adHocCustomerName}` : '👥 散客現場單 (未指名)'}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">提示：可在左側輸入姓名或電話連動正式會員</div>
-            </div>
-            {adHocCustomerName && adHocCustomerName.trim() && (
-                <button 
-                    type="button"
-                    onClick={() => { setAdHocCustomerName(''); showToast('已清空散客姓名'); }} 
-                    className="p-1 text-slate-300 hover:text-red-500 rounded-full transition-all"
-                >
-                    ✕
-                </button>
-            )}
-        </div>
-    )}
-</div>
-                            <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-2">{cart.map(item => {
-                                const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
-                                const itemBorderClass = getThemeClasses(catColorKey, 'accent');
-
-                                return (
-                                <div key={item.cartId} className={`p-3 border border-slate-200 rounded-xl relative group bg-white hover:border-rose-300 transition-all border-l-4 ${itemBorderClass}`}>
-                                    <div className="flex justify-between font-bold text-sm mb-1"><span>{item.name}</span><div className="flex flex-col items-end"><span className={`${item.discount>0?'line-through text-slate-400 text-xs': 'text-rose-600'}`}>{formatCurrency(item.price)}</span>{item.discount > 0 && <span className="text-rose-600">{formatCurrency(item.price - item.discount)}</span>}</div></div><div className="text-xs text-slate-500 flex flex-col gap-0.5"><span className="flex items-center gap-1"><User size={10}/> {item.stylistName} <span className={`ml-1 px-1 rounded ${item.isDesignated ? 'bg-rose-100 text-rose-600':'bg-gray-100 text-gray-500'}`}>{item.isDesignated ? '指定' : '不指定'}</span></span>{item.assistantName && <span className="text-indigo-600">助: {item.assistantName}</span>}{item.discount > 0 && <span className="text-green-600 font-bold">折抵: -{formatCurrency(item.discount)}</span>}</div><div className="absolute right-2 bottom-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => setEditingCartItem(item)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500"><Edit size={14}/></button><button onClick={() => setCart(cart.filter(c => c.cartId !== item.cartId))} className="p-1.5 hover:bg-red-50 text-red-400 rounded"><Trash2 size={14}/></button></div>
-                                </div>
-                            )})}
-                            {cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}</div>
-                            <div className="p-4 border-t bg-white rounded-b-2xl">
-                                <div className="flex justify-between items-end mb-4"><span className="text-slate-500 font-bold">總計</span><span className="text-3xl font-black text-slate-800">{formatCurrency(cartTotal)}</span></div>
-                                <div className="space-y-3 mb-4">
-                                    <div className="flex items-center gap-2 w-full">
-                                        <span className="text-sm font-bold text-slate-500 w-14 text-right">主操作:</span>
-                                        <select className="input-field py-2" value={selectedStylist} onChange={handleMainStylistChange}>
-                                            {safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full">
-                                        <span className="text-sm font-bold text-slate-500 w-14 text-right">協助:</span>
-                                        <select className="input-field py-2" value={selectedAssistant} onChange={e => setSelectedAssistant(e.target.value)}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2"><button onClick={handlePendingOrder} disabled={cart.length === 0} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50">掛單</button><button onClick={() => setShowCheckout(true)} disabled={cart.length === 0} className="flex-[2] btn-primary py-3 rounded-xl font-bold shadow-lg disabled:opacity-50">結帳收款</button></div>
-                            </div>
-                        </div>
-                        
-                        {showCheckout && (
-                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 animate-fade-in shadow-2xl"><h3 className="font-bold text-xl text-center mb-2">確認收款</h3><div className="text-center text-3xl font-black text-rose-500 mb-6">{formatCurrency(cartTotal)}</div><div className="grid grid-cols-1 gap-3">{['現金', '信用卡', '街口支付', 'LINE Pay'].map(m => (<button key={m} onClick={() => handleCheckout(m)} className="w-full p-4 border rounded-xl hover:bg-blue-50 hover:border-blue-500 font-bold text-slate-700 flex items-center justify-center gap-2 transition-all">{m === '現金' && <Banknote size={20}/>}{m === '信用卡' && <CreditCard size={20}/>}{(m.includes('Pay') || m.includes('街口')) && <Smartphone size={20}/>}{m}</button>))}</div><button onClick={() => setShowCheckout(false)} className="w-full py-3 text-slate-400 font-bold">取消</button></div></div>
-                        )}
-
-                        {editingCartItem && (
-                            <Modal title={`編輯: ${editingCartItem.name}`} onClose={()=>setEditingCartItem(null)} size="max-w-sm">
-                                <div className="space-y-4">
-                                    <div className="flex gap-2 items-center bg-slate-50 p-3 rounded-lg border border-slate-200"><input type="checkbox" id="isDesignated" className="w-5 h-5 accent-rose-500" checked={editingCartItem.isDesignated} onChange={e => setEditingCartItem({...editingCartItem, isDesignated: e.target.checked})}/><label htmlFor="isDesignated" className="font-bold text-slate-700">指定設計師</label></div>
-                                    <div className="grid grid-cols-2 gap-3"><div><label className="text-xs text-slate-500 font-bold mb-1 block">售價</label><input type="number" className="input-field" value={editingCartItem.price} onChange={e => setEditingCartItem({...editingCartItem, price: Number(e.target.value)})}/></div><div><label className="text-xs text-slate-500 font-bold mb-1 block">折扣金額</label><input type="number" className="input-field text-red-500" value={editingCartItem.discount} onChange={e => setEditingCartItem({...editingCartItem, discount: Number(e.target.value)})}/></div></div>
-                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">主操作</label><select className="input-field" value={editingCartItem.stylistId} onChange={e => { const s = safeStylists.find(st => st.id === e.target.value); setEditingCartItem({...editingCartItem, stylistId: s.id, stylistName: s.name}); }}>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                                    <div><label className="text-xs font-bold text-slate-500 mb-1 block">助理</label><select className="input-field" value={editingCartItem.assistantId || ''} onChange={e => { const s = safeStylists.find(st => st.id === e.target.value); setEditingCartItem({...editingCartItem, assistantId: s?.id||'', assistantName: s?.name||''}); }}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                                    <div className="flex gap-3 mt-4"><button onClick={() => { setCart(cart.map(c => c.cartId === editingCartItem.cartId ? editingCartItem : c)); setEditingCartItem(null); }} className="btn btn-primary flex-1">確定</button><button onClick={() => setEditingCartItem(null)} className="btn btn-secondary flex-1">取消</button></div>
-                                </div>
-                            </Modal>
-                        )}
                     </div>
                 );
             };
