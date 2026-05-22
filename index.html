@@ -1436,46 +1436,43 @@ const handleUpdateOrder = (updatedOrder) => {
                             <div className="p-4 border-b space-y-3 bg-white">
                                 <div className="flex flex-col md:flex-row gap-2 items-center">
                                     
-                                    {/* 【優化後的會員即時搜尋連動欄位】 */}
+                                    {/* 【優化後的會員即時搜尋欄位：左側不再被鎖定】 */}
                                     <div className="relative w-full flex-1">
                                         <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
                                         <input 
                                             type="text" 
-                                            className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all ${selectedCustomer ? 'border-indigo-500 bg-indigo-50 font-bold text-indigo-700' : ''}`} 
-                                            placeholder={selectedCustomer ? `已連動會員：${selectedCustomer.name}` : "搜尋會員 (輸入電話或姓名)..."} 
-                                            value={selectedCustomer ? selectedCustomer.name : custSearch} 
-                                            onChange={e => { if (!selectedCustomer) setCustSearch(e.target.value); }}
-                                            disabled={!!selectedCustomer}
+                                            className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all" 
+                                            placeholder="🔍 搜尋會員連動 (輸入名字或電話)..." 
+                                            value={custSearch} 
+                                            onChange={e => setCustSearch(e.target.value)}
                                         />
-{selectedCustomer && (
-    <button 
-        onClick={() => { 
-            setSelectedCustomer(null); 
-            setAdHocCustomerName(''); // 同步清除結帳單綁定
-            setCustSearch(''); 
-        }}
-        className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
-    >                                                <X size={16}/>
+                                        {custSearch && (
+                                            <button 
+                                                onClick={() => setCustSearch('')}
+                                                className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
+                                            >
+                                                <X size={16}/>
                                             </button>
                                         )}
-{!selectedCustomer && filteredCustomers.length > 0 && (
-    <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-        {filteredCustomers.map(c => (
-            <div 
-                key={c.id}
-                onClick={() => { 
-                    setSelectedCustomer(c); 
-                    setAdHocCustomerName(c.name); // 關鍵修正：將右側結帳單名字同步綁定為會員姓名
-                    setCustSearch(''); 
-                    showToast(`✅ 已完美連動會員：${c.name}`); 
-                }}
-                className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
-            >                                                        <div>
-                                                            <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
-                                                            <span className="text-xs text-slate-400 font-mono block mt-0.5">{c.phone}</span>
-                                                        </div>
-                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">來店: {c.visits || 0}次</span>
-                                                    </div>
+
+                                        {filteredCustomers.length > 0 && (
+                                            <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                                {filteredCustomers.map(c => (
+                                                    <div 
+                                                        key={c.id}
+                                                        onClick={() => { 
+                                                            setSelectedCustomer(c); 
+                                                            setAdHocCustomerName(c.name); // 將右側結帳單名字同步綁定為會員姓名
+                                                            setCustSearch(''); // 點擊後，左側輸入框立刻清空恢復乾淨
+                                                            showToast(`✅ 右側已完美連動：${c.name}`); 
+                                                        }}
+                                                        className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
+                                                    >                                                                        <div>
+                                                                            <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
+                                                                            <span className="text-xs text-slate-400 font-mono block mt-0.5">{c.phone}</span>
+                                                                        </div>
+                                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">來店: {c.visits || 0}次</span>
+                                                                    </div>
                                                 ))}
                                             </div>
                                         )}
@@ -1515,8 +1512,56 @@ const handleUpdateOrder = (updatedOrder) => {
                             </div>
                         </div>
 
+                        {/* --- 右側面板：持續性連動顯示卡片區 --- */}
                         <div className="w-full lg:w-96 bg-white rounded-2xl shadow-xl flex flex-col h-[45vh] lg:h-full border border-slate-200">
-                            <div className="p-4 border-b flex justify-between items-center bg-slate-50/50"><span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span><div className="flex gap-2"><button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button><span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span></div></div>
+                            <div className="p-4 border-b flex justify-between items-center bg-slate-50/50">
+                                <span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span>
+                                <div className="flex gap-2">
+                                    <button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button>
+                                    <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span>
+                                </div>
+                            </div>
+                            
+                            {/* 刀哥專屬：右側持續性顧客連動卡片顯示區 */}
+                            <div className="px-4 pt-3">
+                                <label className="text-xs font-bold text-slate-400 mb-1 block">當前開單顧客</label>
+                                {selectedCustomer ? (
+                                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 p-3 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
+                                        <div>
+                                            <div className="font-black text-indigo-900 flex items-center gap-1.5 text-base">
+                                                👤 {selectedCustomer.name} 
+                                                <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-md font-bold">已連動會員</span>
+                                            </div>
+                                            <div className="text-xs text-indigo-500 font-mono mt-0.5">📱 {selectedCustomer.phone}</div>
+                                        </div>
+                                        <button 
+                                            onClick={() => { setSelectedCustomer(null); setAdHocCustomerName(''); showToast('已解除會員連動'); }} 
+                                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-white rounded-full transition-all"
+                                            title="解除連動"
+                                        >
+                                            <X size={16}/>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                                        <div>
+                                            <div className="font-bold text-slate-700 text-sm">
+                                                {adHocCustomerName.trim() ? `🚶 散客單：${adHocCustomerName}` : '👥 散客現場單 (未指名)'}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-0.5">提示：可在左側輸入姓名或電話連動正式會員</div>
+                                        </div>
+                                        {adHocCustomerName.trim() && (
+                                            <button 
+                                                onClick={() => { setAdHocCustomerName(''); showToast('已清空散客姓名'); }} 
+                                                className="p-1 text-slate-300 hover:text-red-500 rounded-full transition-all"
+                                            >
+                                                <X size={14}/>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
                             <div className="flex-1 overflow-y-auto p-3 space-y-2">{cart.map(item => {
                                 const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
