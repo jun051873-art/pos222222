@@ -1447,23 +1447,30 @@ const handleUpdateOrder = (updatedOrder) => {
                                             onChange={e => { if (!selectedCustomer) setCustSearch(e.target.value); }}
                                             disabled={!!selectedCustomer}
                                         />
-                                        {selectedCustomer && (
-                                            <button 
-                                                onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
-                                                className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
-                                            >
-                                                <X size={16}/>
+{selectedCustomer && (
+    <button 
+        onClick={() => { 
+            setSelectedCustomer(null); 
+            setAdHocCustomerName(''); // 同步清除結帳單綁定
+            setCustSearch(''); 
+        }}
+        className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
+    >                                                <X size={16}/>
                                             </button>
                                         )}
-                                        {!selectedCustomer && filteredCustomers.length > 0 && (
-                                            <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                                                {filteredCustomers.map(c => (
-                                                    <div 
-                                                        key={c.id}
-                                                        onClick={() => { setSelectedCustomer(c); setCustSearch(''); showToast(`已連動會員：${c.name}`); }}
-                                                        className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
-                                                    >
-                                                        <div>
+{!selectedCustomer && filteredCustomers.length > 0 && (
+    <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+        {filteredCustomers.map(c => (
+            <div 
+                key={c.id}
+                onClick={() => { 
+                    setSelectedCustomer(c); 
+                    setAdHocCustomerName(c.name); // 關鍵修正：將右側結帳單名字同步綁定為會員姓名
+                    setCustSearch(''); 
+                    showToast(`✅ 已完美連動會員：${c.name}`); 
+                }}
+                className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
+            >                                                        <div>
                                                             <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
                                                             <span className="text-xs text-slate-400 font-mono block mt-0.5">{c.phone}</span>
                                                         </div>
