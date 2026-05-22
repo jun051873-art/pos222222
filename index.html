@@ -1108,11 +1108,10 @@ const handleUpdateOrder = (updatedOrder) => {
                 );
             };
 
-            // [POS View] (v12.0)
+// [POS View] (v18.6 Ultimate 修正版 - 完美連動客資搜尋)
             const POSView = () => {
                 const [cart, setCart] = useState([]);
                 const [selectedCategory, setSelectedCategory] = useState('全部');
-                // 預設選取第一位設計師
                 const [selectedStylist, setSelectedStylist] = useState(safeStylists[0]?.id || '');
                 const [selectedAssistant, setSelectedAssistant] = useState('');
                 const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -1125,21 +1124,17 @@ const handleUpdateOrder = (updatedOrder) => {
                 const [isAddingCustomer, setIsAddingCustomer] = useState(false);
                 const [editingCartItem, setEditingCartItem] = useState(null);
 
-                // 分類顏色 (v18.0 強化)
                 const getCategoryColor = (cat) => {
                     const themeKey = safeSettings.categoryColors[cat] || 'slate';
                     return getThemeClasses(themeKey, 'card');
                 };
 
-                // ★ 新增：當切換「主操作」時，同步更新購物車內所有項目的設計師
                 const handleMainStylistChange = (e) => {
                     const newStylistId = e.target.value;
                     setSelectedStylist(newStylistId);
-
                     const stylistObj = safeStylists.find(s => s.id === newStylistId);
                     const stylistName = stylistObj ? stylistObj.name : '未指定';
 
-                    // 同步更新購物車
                     if (cart.length > 0) {
                         const updatedCart = cart.map(item => ({
                             ...item,
@@ -1150,6 +1145,14 @@ const handleUpdateOrder = (updatedOrder) => {
                         showToast(`已將所有項目同步為：${stylistName}`);
                     }
                 };
+
+                // 【修正：連動客資過濾邏輯】
+                const filteredCustomers = useMemo(() => {
+                    if (!custSearch.trim()) return [];
+                    return safeCustomers.filter(c => 
+                        (c.name || '').includes(custSearch) || (c.phone || '').includes(custSearch)
+                    );
+                }, [safeCustomers, custSearch]);
 
                 const filteredServices = useMemo(() => {
                     let items = safeServices.filter(s => !s.isInternal);
@@ -1176,7 +1179,6 @@ const handleUpdateOrder = (updatedOrder) => {
                         category: service.category, 
                         stock: service.stock, 
                         isProduct: service.isProduct, 
-                        // 加入時，直接使用當前選定的主操作人員
                         stylistId: selectedStylist, 
                         stylistName: stylistObj?.name || '未指定', 
                         assistantId: selectedAssistant, 
@@ -1200,71 +1202,66 @@ const handleUpdateOrder = (updatedOrder) => {
                     setPendingOrders(safePendingOrders.filter(o => o.id !== order.id)); setShowPending(false); showToast('單據已取出');
                 };
 
-const handleCheckout = (paymentMethod) => {
-                if (cart.length === 0) return;
-                
-                const finalCustName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
-                const finalCustId = selectedCustomer ? selectedCustomer.id : null;
-                const finalGender = selectedCustomer ? selectedCustomer.gender : adHocGender;
+                const handleCheckout = (paymentMethod) => {
+                    if (cart.length === 0) return;
+                    
+                    const finalCustName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
+                    const finalCustId = selectedCustomer ? selectedCustomer.id : null;
+                    const finalGender = selectedCustomer ? selectedCustomer.gender : adHocGender;
 
-                // 1. 產生新訂單
-                const newOrder = { 
-                    id: generateId(), 
-                    date: new Date(checkoutDate).toISOString(), 
-                    items: cart, 
-                    total: cartTotal, 
-                    paymentMethod, 
-                    mainStylistId: selectedStylist, 
-                    customerId: finalCustId, 
-                    customerName: finalCustName,
-                    customerGender: finalGender,
-                    createdAt: new Date().toISOString() 
+                    const newOrder = { 
+                        id: generateId(), 
+                        date: new Date(checkoutDate).toISOString(), 
+                        items: cart, 
+                        total: cartTotal, 
+                        paymentMethod, 
+                        mainStylistId: selectedStylist, 
+                        customerId: finalCustId, 
+                        customerName: finalCustName,
+                        customerGender: finalGender,
+                        createdAt: new Date().toISOString() 
+                    };
+
+                    const updatedServices = safeServices.map(s => {
+                        const cartItems = cart.filter(i => i.id === s.id);
+                        if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
+                            return { ...s, stock: Math.max(0, s.stock - cartItems.length) }; 
+                        }
+                        return s;
+                    });
+                    setServices(updatedServices);
+                    
+                    const newLogs = cart.filter(i=>i.isProduct).map(i=>({ id: generateId(), date: new Date().toISOString(), type: '銷售', itemName: i.name, qty: 1, cost: i.cost, note: `訂單 #${newOrder.id.slice(0,6)}`, operator: 'System' }));
+                    setInventoryLogs([...newLogs, ...safeInventoryLogs]);
+
+                    if (selectedCustomer) {
+                        setCustomers(safeCustomers.map(c => c.id === selectedCustomer.id ? { ...c, visits: (c.visits || 0) + 1, totalSpend: (c.totalSpend || 0) + cartTotal } : c));
+                    }
+
+                    setTransactions([newOrder, ...safeTransactions]);
+                    setCart([]); 
+                    setSelectedCustomer(null); 
+                    setAdHocCustomerName(''); 
+                    setShowCheckout(false); 
+                    
+                    if (safeSettings.autoBackup) {
+                        setTimeout(() => {
+                            try {
+                                const backupData = { services: updatedServices, stylists: safeStylists, customers: safeCustomers, transactions: [newOrder, ...safeTransactions], settings: safeSettings, inventoryLogs: [...newLogs, ...safeInventoryLogs], expenses: safeExpenses };
+                                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = "salon_backup_auto.json";
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                            } catch(e) { console.error(e); }
+                        }, 1000);
+                    }
                 };
 
-        // 1. 更新商品庫存
-        const updatedServices = safeServices.map(s => {
-            const cartItems = cart.filter(i => i.id === s.id);
-            if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
-                return { ...s, stock: Math.max(0, s.stock - cartItems.length) }; 
-            }
-            return s;
-        });
-        setServices(updatedServices);
-        
-        // 2. 記錄庫存異動日誌
-        const newLogs = cart.filter(i=>i.isProduct).map(i=>({ id: generateId(), date: new Date().toISOString(), type: '銷售', itemName: i.name, qty: 1, cost: i.cost, note: `訂單 #${newOrder.id.slice(0,6)}`, operator: 'System' }));
-        setInventoryLogs([...newLogs, ...safeInventoryLogs]);
-
-        // 3. 如果是會員，更新消費累計
-        if (selectedCustomer) {
-            setCustomers(safeCustomers.map(c => c.id === selectedCustomer.id ? { ...c, visits: (c.visits || 0) + 1, totalSpend: (c.totalSpend || 0) + cartTotal } : c));
-        }
-
-        // 4. 存入交易紀錄並重置頁面
-        setTransactions([newOrder, ...safeTransactions]);
-        setCart([]); 
-        setSelectedCustomer(null); 
-        setAdHocCustomerName(''); 
-        setShowCheckout(false); 
-        
-        // 5. 自動備份邏輯
-        if (safeSettings.autoBackup) {
-            setTimeout(() => {
-                try {
-                    const backupData = { services: updatedServices, stylists: safeStylists, customers: safeCustomers, transactions: [newOrder, ...safeTransactions], settings: safeSettings, inventoryLogs: [...newLogs, ...safeInventoryLogs], expenses: safeExpenses };
-                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = "salon_backup_auto.json";
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                } catch(e) { console.error(e); }
-            }, 1000);
-        }
-   };
                 return (
                     <div className="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden relative">
                         {isAddingCustomer && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl"><h3 className="font-bold text-lg">快速新增顧客</h3><QuickCustomerForm stylists={safeStylists} onSave={(data) => { const newCust = { id: generateId(), ...data, visits: 0, totalSpend: 0, tags: [] }; setCustomers([...safeCustomers, newCust]); setSelectedCustomer(newCust); setIsAddingCustomer(false); }} onCancel={() => setIsAddingCustomer(false)}/></div></div>}
@@ -1281,14 +1278,54 @@ const handleCheckout = (paymentMethod) => {
 
                         <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-4 border-b space-y-3 bg-white">
-                                <div className="flex gap-2">
-<input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all" placeholder="搜尋會員 (電話/姓名)..." value={custSearch} onChange={e => setCustSearch(e.target.value)}/>                                   <div className="flex gap-2">
-<input type="text" className="input-field w-28 py-2.5" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)} disabled={!!selectedCustomer}/>    <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
-        <option value="女">女生</option>
-        <option value="男">男生</option>
-        <option value="兒童">兒童</option>
-    </select>
-</div>
+                                <div className="flex flex-col md:flex-row gap-2 items-center">
+                                    
+                                    {/* 【優化後的會員即時搜尋連動欄位】 */}
+                                    <div className="relative w-full flex-1">
+                                        <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
+                                        <input 
+                                            type="text" 
+                                            className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all ${selectedCustomer ? 'border-indigo-500 bg-indigo-50 font-bold text-indigo-700' : ''}`} 
+                                            placeholder={selectedCustomer ? `已連動會員：${selectedCustomer.name}` : "搜尋會員 (輸入電話或姓名)..."} 
+                                            value={selectedCustomer ? selectedCustomer.name : custSearch} 
+                                            onChange={e => { if (!selectedCustomer) setCustSearch(e.target.value); }}
+                                            disabled={!!selectedCustomer}
+                                        />
+                                        {selectedCustomer && (
+                                            <button 
+                                                onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
+                                                className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
+                                            >
+                                                <X size={16}/>
+                                            </button>
+                                        )}
+                                        {!selectedCustomer && filteredCustomers.length > 0 && (
+                                            <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                                {filteredCustomers.map(c => (
+                                                    <div 
+                                                        key={c.id}
+                                                        onClick={() => { setSelectedCustomer(c); setCustSearch(''); showToast(`已連動會員：${c.name}`); }}
+                                                        className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
+                                                    >
+                                                        <div>
+                                                            <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
+                                                            <span className="text-xs text-slate-400 font-mono block mt-0.5">{c.phone}</span>
+                                                        </div>
+                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">來店: {c.visits || 0}次</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        <input type="text" className="input-field w-28 py-2.5" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)} disabled={!!selectedCustomer}/> 
+                                        <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
+                                            <option value="女">女生</option>
+                                            <option value="男">男生</option>
+                                            <option value="兒童">兒童</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
                             </div>
@@ -1298,7 +1335,6 @@ const handleCheckout = (paymentMethod) => {
                                         const inCartCount = cart.filter(i => i.id === s.id).length; 
                                         const remaining = s.stock !== null ? s.stock - inCartCount : null; 
                                         const noStock = remaining !== null && remaining <= 0; 
-                                        // v18.0: 使用自訂分類顏色
                                         const colorClass = getCategoryColor(s.category);
                                         
                                         return (
@@ -1320,7 +1356,6 @@ const handleCheckout = (paymentMethod) => {
                             <div className="p-4 border-b flex justify-between items-center bg-slate-50/50"><span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span><div className="flex gap-2"><button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button><span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span></div></div>
                             <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
                             <div className="flex-1 overflow-y-auto p-3 space-y-2">{cart.map(item => {
-                                // v18.0: 購物車項目加上分類色條
                                 const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
                                 const itemBorderClass = getThemeClasses(catColorKey, 'accent');
 
@@ -1335,7 +1370,6 @@ const handleCheckout = (paymentMethod) => {
                                 <div className="space-y-3 mb-4">
                                     <div className="flex items-center gap-2 w-full">
                                         <span className="text-sm font-bold text-slate-500 w-14 text-right">主操作:</span>
-                                        {/* 修改：onChange 事件改為呼叫新的 handleMainStylistChange */}
                                         <select className="input-field py-2" value={selectedStylist} onChange={handleMainStylistChange}>
                                             {safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
@@ -1367,7 +1401,6 @@ const handleCheckout = (paymentMethod) => {
                     </div>
                 );
             };
-
             // [StaffView] (v13.0 修正版：防崩潰 + 必填檢查)
             const StaffView = () => {
                 const [isEditing, setIsEditing] = useState(false);
