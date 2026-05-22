@@ -1731,16 +1731,16 @@ const SettingsView = () => {
                         <p className="text-[10px] text-slate-400 mt-1">※ 相同店號的資料會存於同一個雲端資料夾</p>
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第二步：生成同步金鑰 (Sync Token)</label>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第二步：手動輸入或生成同步金鑰 (Sync Token)</label>
                         <div className="flex gap-2">
-                            <input 
-                                className="input-field font-mono text-lg text-indigo-600 font-bold bg-slate-50 flex-1" 
-                                readOnly
-                                placeholder="點擊自動生成" 
-                                value={localSyncToken} 
-                            />
-                            <button onClick={(e) => { e.preventDefault(); generateSyncToken(); }} className="btn btn-secondary whitespace-nowrap bg-slate-800 text-white">自動生成</button>
-                        </div>
+                       <input 
+                            className="input-field font-mono text-lg text-indigo-600 font-bold bg-white flex-1" 
+                            placeholder="請輸入自訂金鑰密碼" 
+                            value={localSyncToken} 
+                            onChange={(e) => setLocalSyncToken(e.target.value)}
+                        />
+                             <button onClick={(e) => { e.preventDefault(); const t = Math.random().toString(36).substring(2, 10).toUpperCase(); setLocalSyncToken(t); }} className="btn btn-secondary whitespace-nowrap bg-slate-800 text-white">自動生成</button>
+                        </div>                   
                     </div>
                 </div>
                 <div className="flex gap-4">
