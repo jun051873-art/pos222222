@@ -184,10 +184,8 @@
             return (
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
-                        <input className="input-field" placeholder="姓名" value={form.name} onChange={e => setForm({...form, name: e.target.value})}/>
-                        <div className="flex gap-2">
-                            <input className="input-field flex-1" placeholder="電話" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}/>
-                            <select className="input-field w-24" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}>
+<input type="text" className="input-field" placeholder="姓名" value={form.name} onChange={e => setForm({...form, name: e.target.value})}/>                        <div className="flex gap-2">
+<input type="text" className="input-field flex-1" placeholder="電話" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}/>                            <select className="input-field w-24" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}>
                                 <option value="女">女客</option>
                                 <option value="男">男客</option>
                                 <option value="兒童">兒童</option>
@@ -624,8 +622,7 @@ const handleUpdateOrder = (updatedOrder) => {
                                     <option value="all">全體人員</option>
                                     {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                 </select>
-                                <div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input className="input-field pl-10" placeholder="搜尋..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>
-                            </div>
+<div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input type="text" className="input-field pl-10" placeholder="搜尋..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                            </div>
                         </div>
 
                         {/* 卡片式列表區域 */}
@@ -1002,8 +999,7 @@ const handleUpdateOrder = (updatedOrder) => {
                             {mode === 'list' && (
                                 <div className="relative w-full md:w-64">
                                     <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-                                    <input className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
-                                </div>
+<input type="text" className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>                                </div>
                             )}
                         </div>
 
@@ -1286,10 +1282,8 @@ const handleCheckout = (paymentMethod) => {
                         <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-4 border-b space-y-3 bg-white">
                                 <div className="flex gap-2">
-                                    <div className="relative flex-1">{selectedCustomer ? (<div className="flex justify-between items-center bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg"><span className="font-bold text-rose-700 flex items-center gap-2"><User size={16}/> {selectedCustomer.name}</span><button onClick={()=>setSelectedCustomer(null)}><X size={16} className="text-rose-400"/></button></div>) : (<><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all" placeholder="搜尋會員 (電話/姓名)..." value={custSearch} onChange={e => setCustSearch(e.target.value)}/>{custSearch && (<div className="absolute top-full left-0 w-full bg-white shadow-xl border rounded-lg mt-1 max-h-48 overflow-y-auto z-20">{safeCustomers.filter(c => (c.name||'').includes(custSearch) || (c.phone||'').includes(custSearch)).map(c => (<div key={c.id} onClick={()=>{setSelectedCustomer(c); setCustSearch('');}} className="p-3 hover:bg-slate-50 cursor-pointer border-b text-sm font-bold text-slate-700">{c.name} <span className="font-normal text-slate-400 ml-2">{c.phone}</span></div>))}<button onClick={() => setIsAddingCustomer(true)} className="w-full p-3 text-rose-500 font-bold text-sm hover:bg-rose-50">+ 新增顧客</button></div>)}</>)}</div>
-                                   <div className="flex gap-2">
-    <input className="input-field w-28 py-2.5" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)} disabled={!!selectedCustomer}/>
-    <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
+<input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all" placeholder="搜尋會員 (電話/姓名)..." value={custSearch} onChange={e => setCustSearch(e.target.value)}/>                                   <div className="flex gap-2">
+<input type="text" className="input-field w-28 py-2.5" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)} disabled={!!selectedCustomer}/>    <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
         <option value="女">女生</option>
         <option value="男">男生</option>
         <option value="兒童">兒童</option>
@@ -1517,8 +1511,7 @@ const handleCheckout = (paymentMethod) => {
                                         <option value="">(未指定)</option>
                                         {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                     </select>
-                                    <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input className="input-field pl-10 py-2" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>
-                                    <button onClick={()=>{setEditForm({tags:[]}); setIsEditing(true);}} className="btn btn-primary whitespace-nowrap"><UserPlus size={18}/> 新增顧客</button>
+<div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input type="text" className="input-field pl-10 py-2" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                                    <button onClick={()=>{setEditForm({tags:[]}); setIsEditing(true);}} className="btn btn-primary whitespace-nowrap"><UserPlus size={18}/> 新增顧客</button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1831,16 +1824,14 @@ const SettingsView = () => {
                     <div>
                         <h4 className="text-sm font-bold text-slate-500 mb-3">服務/商品分類</h4>
                         <div className="flex gap-3 mb-4">
-                            <input className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/>
-                            <button onClick={addCategory} className="btn btn-secondary">新增</button>
+<input type="text" className="input-field" placeholder="新分類名稱" value={categoryInput} onChange={e=>setCategoryInput(e.target.value)}/>                            <button onClick={addCategory} className="btn btn-secondary">新增</button>
                         </div>
                         <div className="flex flex-wrap gap-2">{safeSettings.categories.map(c=>(<span key={c} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{c} <button onClick={()=>removeCategory(c)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
                     </div>
                     <div>
                         <h4 className="text-sm font-bold text-slate-500 mb-3">支出項目分類</h4>
                         <div className="flex gap-3 mb-4">
-                            <input className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/>
-                            <button onClick={addExpenseType} className="btn btn-secondary">新增</button>
+<input type="text" className="input-field" placeholder="新支出項目" value={expenseTypeInput} onChange={e=>setExpenseTypeInput(e.target.value)}/>                            <button onClick={addExpenseType} className="btn btn-secondary">新增</button>
                         </div>
                         <div className="flex flex-wrap gap-2">{safeSettings.expenseTypes.map(t=>(<span key={t} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200">{t} <button onClick={()=>removeExpenseType(t)} className="text-slate-400 hover:text-red-500"><X size={14}/></button></span>))}</div>
                     </div>
