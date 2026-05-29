@@ -455,74 +455,83 @@ const handleUpdateOrder = (updatedOrder) => {
     setEditingOrder(null);
     showToast('訂單已修正');
 };
-                // Edit Modal Inner Component
-                const EditOrderModal = ({ order, onClose, onSave }) => {
-                    const [form, setForm] = useState(JSON.parse(JSON.stringify(order))); 
-                    
-                    const updateItem = (idx, field, value) => {
-                        const newItems = [...form.items];
-                        newItems[idx][field] = value;
-                        const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
-                        setForm({ ...form, items: newItems, total: newTotal });
-                    };
+// 替換你原本的 EditOrderModal
+const EditOrderModal = ({ order, onClose, onSave }) => {
+    // 💡 關鍵：我們建立一個與外部完全分離的 Local State
+    const [form, setForm] = useState(() => JSON.parse(JSON.stringify(order))); 
+    
+    // 💡 關鍵：防止輸入框在修改時觸發整個元件的重新對焦與重繪
+    const updateItem = useCallback((cartId, field, value) => {
+        setForm(prevForm => {
+            const newItems = prevForm.items.map(item => 
+                item.cartId === cartId ? { ...item, [field]: value } : item
+            );
+            const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
+            return { ...prevForm, items: newItems, total: newTotal };
+        });
+    }, []);
 
-                    const deleteItem = (idx) => {
-                        const newItems = form.items.filter((_, i) => i !== idx);
-                        const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
-                        setForm({ ...form, items: newItems, total: newTotal });
-                    };
+    const deleteItem = useCallback((cartId) => {
+        setForm(prevForm => {
+            const newItems = prevForm.items.filter(item => item.cartId !== cartId);
+            const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
+            return { ...prevForm, items: newItems, total: newTotal };
+        });
+    }, []);
 
-                    const handleConvertToMember = () => {
-                        const inputName = prompt('請輸入新會員姓名：', form.customerName || '');
-                        if (!inputName) return;
-                        const inputPhone = prompt(`請輸入 ${inputName} 的電話號碼：`);
-                        if (!inputPhone) return;
+    // ... (handleConvertToMember 保持原樣) ...
+    const handleConvertToMember = () => {
+        const inputName = prompt('請輸入新會員姓名：', form.customerName || '');
+        if (!inputName) return;
+        const inputPhone = prompt(`請輸入 ${inputName} 的電話號碼：`);
+        if (!inputPhone) return;
+        const newId = generateId();
+        const newCustomer = { id: newId, name: inputName, phone: inputPhone, notes: '由查單介面轉入', visits: 1, totalSpend: form.total, tags: [] };
+        setCustomers([...safeCustomers, newCustomer]);
+        setForm({ ...form, customerId: newId, customerName: inputName });
+        showToast(`已成功建立會員：${newCustomer.name}`);
+    };
 
-                        const newId = generateId();
-                        const newCustomer = {
-                            id: newId, name: inputName, phone: inputPhone,
-                            notes: '由查單介面轉入', visits: 1, totalSpend: form.total, tags: []
-                        };
-                        
-                        setCustomers([...safeCustomers, newCustomer]);
-                        setForm({ ...form, customerId: newId, customerName: inputName });
-                        showToast(`已成功建立會員：${newCustomer.name}`);
-                    };
-
-                    return (
-                        <Modal title={`編輯訂單 #${order.id.slice(0,8)}`} onClose={onClose} size="max-w-2xl">
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border">
-                                    <div><label className="text-xs font-bold text-slate-500">日期</label><input type="datetime-local" className="input-field" value={form.date.slice(0,16)} onChange={e=>setForm({...form, date: new Date(e.target.value).toISOString()})}/></div>
-                                    <div><label className="text-xs font-bold text-slate-500">付款方式</label><select className="input-field" value={form.paymentMethod} onChange={e=>setForm({...form, paymentMethod: e.target.value})}>{['現金', '信用卡', '街口支付', 'LINE Pay'].map(m=><option key={m} value={m}>{m}</option>)}</select></div>
-                                    <div><label className="text-xs font-bold text-slate-500">主設計師</label><select className="input-field" value={form.mainStylistId} onChange={e=>setForm({...form, mainStylistId: e.target.value})}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                                    <div>
-                                        <div className="flex justify-between items-end mb-1">
-                                            <label className="text-xs font-bold text-slate-500">顧客姓名 {form.customerId ? '(會員)' : '(散客)'}</label>
-                                            {!form.customerId && (<button onClick={handleConvertToMember} className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700 transition-colors flex items-center gap-1"><UserPlus size={10}/> 轉為會員</button>)}
-                                        </div>
-                                        <input type="text" className={`input-field ${form.customerId ? 'bg-indigo-50 text-indigo-700 font-bold opacity-70 cursor-not-allowed' : ''}`} value={form.customerName || ''} onChange={e => setForm({...form, customerName: e.target.value})} disabled={!!form.customerId} placeholder="輸入散客姓名"/>
-                                    </div>
+    return (
+        <Modal title={`編輯訂單 #${order.id.slice(0,8)}`} onClose={onClose} size="max-w-2xl">
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border">
+                    <div><label className="text-xs font-bold text-slate-500">日期</label><input type="datetime-local" className="input-field" value={form.date.slice(0,16)} onChange={e=>setForm({...form, date: new Date(e.target.value).toISOString()})}/></div>
+                    <div><label className="text-xs font-bold text-slate-500">付款方式</label><select className="input-field" value={form.paymentMethod} onChange={e=>setForm({...form, paymentMethod: e.target.value})}>{['現金', '信用卡', '街口支付', 'LINE Pay'].map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+                    <div><label className="text-xs font-bold text-slate-500">主設計師</label><select className="input-field" value={form.mainStylistId} onChange={e=>setForm({...form, mainStylistId: e.target.value})}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                    <div>
+                        <div className="flex justify-between items-end mb-1">
+                            <label className="text-xs font-bold text-slate-500">顧客姓名</label>
+                            {!form.customerId && (<button onClick={handleConvertToMember} className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700">轉為會員</button>)}
+                        </div>
+                        <input type="text" className="input-field" value={form.customerName || ''} onChange={e => setForm({...form, customerName: e.target.value})} disabled={!!form.customerId}/>
+                    </div>
+                </div>
+                <div className="border-t pt-4">
+                    <h4 className="font-bold mb-2">訂單項目</h4>
+                    <div className="space-y-2">
+                        {form.items.map((item) => (
+                            // 💡 強制使用 item.cartId 作為渲染 Key，確保 DOM 不會被清空重繪
+                            <div key={item.cartId} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-slate-50">
+                                <div className="flex-1"><div className="font-bold text-sm">{item.name}</div></div>
+                                <div className="w-24">
+                                    <label className="text-[10px] block text-slate-400">售價</label>
+                                    <input type="number" className="input-field py-1 px-2 text-sm" value={item.price} onChange={e=>updateItem(item.cartId, 'price', Number(e.target.value))}/>
                                 </div>
-                                <div className="border-t pt-4">
-                                    <h4 className="font-bold mb-2">訂單項目</h4>
-                                    <div className="space-y-2">
-                                        {form.items.map((item, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-slate-50">
-                                                <div className="flex-1"><div className="font-bold text-sm">{item.name}</div><div className="text-xs text-slate-500">{item.category}</div></div>
-                                                <div className="w-24"><label className="text-[10px] block text-slate-400">售價</label><input type="number" className="input-field py-1 px-2 text-sm" value={item.price} onChange={e=>updateItem(idx, 'price', Number(e.target.value))}/></div>
-                                                <div className="w-20"><label className="text-[10px] block text-slate-400">折扣</label><input type="number" className="input-field py-1 px-2 text-sm text-red-500" value={item.discount||0} onChange={e=>updateItem(idx, 'discount', Number(e.target.value))}/></div>
-                                                <button onClick={()=>deleteItem(idx)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                <div className="w-20">
+                                    <label className="text-[10px] block text-slate-400">折扣</label>
+                                    <input type="number" className="input-field py-1 px-2 text-sm text-red-500" value={item.discount||0} onChange={e=>updateItem(item.cartId, 'discount', Number(e.target.value))}/>
                                 </div>
-                                <div className="border-t pt-4 flex justify-between items-center"><div className="text-xl font-black text-slate-800">總計: {formatCurrency(form.total)}</div><div className="flex gap-2"><button onClick={onClose} className="btn btn-secondary">取消</button><button onClick={()=>onSave(form)} className="btn btn-primary">儲存修正</button></div></div>
+                                <button onClick={()=>deleteItem(item.cartId)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
                             </div>
-                        </Modal>
-                    );
-                };
-
+                        ))}
+                    </div>
+                </div>
+                <div className="border-t pt-4 flex justify-between items-center"><div className="text-xl font-black text-slate-800">總計: {formatCurrency(form.total)}</div><div className="flex gap-2"><button onClick={onClose} className="btn btn-secondary">取消</button><button onClick={()=>onSave(form)} className="btn btn-primary">儲存修正</button></div></div>
+            </div>
+        </Modal>
+    );
+};                
                 return (
                     <div className="p-6 h-full overflow-y-auto">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -1260,23 +1269,25 @@ const handleUpdateOrder = (updatedOrder) => {
                 const stylistObj = safeStylists.find(s => s.id === selectedStylist);
                 const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
                 
-                setCart([...cart, { 
-                    cartId: generateId(), 
-                    id: service.id, 
-                    name: service.name, 
-                    price: service.price, 
-                    cost: service.cost || 0, 
-                    category: service.category, 
-                    stock: service.stock, 
-                    isProduct: service.isProduct, 
-                    stylistId: selectedStylist, 
-                    stylistName: stylistObj?.name || '未指定', 
-                    assistantId: selectedAssistant, 
-                    assistantName: assistantObj?.name || '', 
-                    isDesignated: true, 
-                    discount: 0 
-                }]);
-            };
+               // 這裡一定要用 generateId() 產生唯一的 cartId，React 才知道這是一張永遠的單
+    const newItem = { 
+        cartId: generateId(), 
+        id: service.id, 
+        name: service.name, 
+        price: service.price, 
+        cost: service.cost || 0, 
+        category: service.category, 
+        stock: service.stock, 
+        isProduct: service.isProduct, 
+        stylistId: selectedStylist, 
+        stylistName: stylistObj?.name || '未指定', 
+        assistantId: selectedAssistant, 
+        assistantName: assistantObj?.name || '', 
+        isDesignated: true, 
+        discount: 0 
+    };
+    setCart([...cart, newItem]);
+};
 
             const handlePendingOrder = () => {
                 if (cart.length === 0) return;
@@ -1622,73 +1633,57 @@ if (c.preferredStylistId) {
                         <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
                         
                         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                            {cart.map((item, idx) => {
-                                const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
-                                const itemBorderClass = getThemeClasses(catColorKey, 'accent');
+                           
+                      {/* 這裡把外層 button 改成 div，防止點擊「修改」或「刪除」時觸發整張卡片的點擊事件 */}
+ {cart.map((item, idx) => {
+    const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
+    const itemBorderClass = getThemeClasses(catColorKey, 'accent');
 
-                                return (
-                                    <div key={item.cartId || idx} className={`p-3 border border-slate-200 rounded-xl relative group bg-white hover:border-indigo-300 transition-all border-l-4 ${itemBorderClass}`}>
-                                        <div className="flex justify-between font-bold text-sm mb-1">
-                                            <span className="text-slate-800">{item.name}</span>
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-slate-700 font-black font-mono">
-                                                    {formatCurrency(item.price)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="text-xs text-slate-500 flex justify-between items-center mt-2">
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="flex items-center gap-1">
-                                                    <User size={10}/> {item.stylistName || '未指定'} 
-                                                    <span className={`ml-1 px-1 rounded text-[10px] ${item.isDesignated ? 'bg-rose-100 text-rose-600':'bg-gray-100 text-gray-500'}`}>
-                                                        {item.isDesignated ? '指定' : '不指定'}
-                                                    </span>
-                                                </span>
-                                            </div>
-                                            
-                                            <div className="flex gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const val = prompt(`請輸入 [${item.name}] 要變更的結帳售價:`, item.price);
-                                                        if (val === null) return;
-                                                        
-                                                        const newPrice = Number(val);
-                                                        if (isNaN(newPrice) || newPrice < 0) {
-                                                            showToast('請輸入正確的數字金額', 'error');
-                                                            return;
-                                                        }
+    return (
+        <div key={item.cartId || idx} className={`p-3 border border-slate-200 rounded-xl relative group bg-white border-l-4 ${itemBorderClass}`}>
+            <div className="flex justify-between font-bold text-sm mb-1">
+                <span className="text-slate-800">{item.name}</span>
+                <span className="text-slate-700 font-black font-mono">{formatCurrency(item.price)}</span>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-2">
+                {/* 絕對不會閃跳的修改金額按鈕 */}
+                <button 
+                    type="button"
+                    className="p-1.5 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const val = prompt('請輸入新售價:', item.price);
+                        if (val !== null && val.trim() !== '') {
+                            const newPrice = Number(val);
+                            if (!isNaN(newPrice)) {
+                                setCart(prev => prev.map(c => c.cartId === item.cartId ? { ...c, price: newPrice } : c));
+                            }
+                        }
+                    }}
+                >
+                    <Edit size={14}/>
+                </button>
+                
+                {/* 絕對不會閃跳的刪除按鈕 */}
+                <button 
+                    type="button"
+                    className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCart(prev => prev.filter(c => c.cartId !== item.cartId));
+                    }}
+                >
+                    <Trash2 size={14}/>
+                </button>
+            </div>
+        </div>
+    );
+})}
 
-                                                        const newCart = [...cart];
-                                                        newCart[idx].price = newPrice;
-                                                        setCart(newCart);
-                                                        showToast('實收金額已更新');
-                                                    }} 
-                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                                    title="變更此單售價"
-                                                >
-                                                    <Edit size={14}/>
-                                                </button>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (confirm(`確定要從結帳清單中移除 [${item.name}] 嗎？`)) {
-                                                            setCart(cart.filter((_, i) => i !== idx));
-                                                            showToast('項目已移除');
-                                                        }
-                                                    }} 
-                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                    title="移除此項目"
-                                                >
-                                                    <Trash2 size={14}/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}
+{cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}
                         </div>
 
                         <div className="p-4 border-t bg-white rounded-b-2xl">
