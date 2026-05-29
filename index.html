@@ -226,8 +226,8 @@
             </div>
         );
 
-       // --- 6. App ---
-function HairSalonApp() {
+       // --- 6. App ---    
+    function HairSalonApp() {
     const [activeTab, setActiveTab] = useState('pos');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [notification, setNotification] = useState(null);
@@ -240,7 +240,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
     const [inventoryLogs, setInventoryLogs] = useStickyState('salon_inventory_logs', []);
     const [expenses, setExpenses] = useStickyState('salon_expenses', []);
     const [pendingOrders, setPendingOrders] = useStickyState('salon_pending_orders', []);
-  
+    
     const [settings, setSettings] = useStickyState('salon_settings', {
         categories: DEFAULT_CATEGORIES,
         expenseTypes: DEFAULT_EXPENSE_TYPES,
@@ -257,20 +257,16 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         genderColors: DEFAULT_GENDER_COLORS
     });
 
-// --- 1. 生成金鑰並「自動複製」 ---
+// ==========================================
+    // 🌟 雲端安全過渡區：移除非必要邏輯，保留還原按鈕對接
+    // ==========================================
+
+    // 1. 保留原本的生成金鑰邏輯（確保你原有的欄位不會報錯）
     const generateSyncToken = () => {
-        // 生成 8 位數隨機金鑰
         const token = Math.random().toString(36).substring(2, 10).toUpperCase();
-        
-        // 取得目前的 Shop ID，如果沒填就用 Default
         const currentShopID = settings.shopID || "MySalon";
-        
-        // 合併為：店號-金鑰 (例如: SpecialSpace-A1B2C3D4)
         const combinedKey = `${currentShopID}-${token}`;
-        
         setSettings({ ...settings, syncToken: combinedKey });
-        
-        // 自動執行複製
         if (navigator.clipboard) {
             navigator.clipboard.writeText(combinedKey).then(() => {
                 showToast(`金鑰已複製: ${combinedKey}`);
@@ -280,136 +276,57 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         }
     };
 
-    // --- 2. 激活雲端系統 (整合第一次存檔，確保後台立刻出現資料) ---
-    const activateCloudSync = async () => {
-        const { cloudKey, syncToken, shopID } = safeSettings;
-        if (!cloudKey || !syncToken) {
-            showToast("請填寫鑰匙並生成金鑰", "error");
+    // 2. 舊的激活功能已不需要，改為空函式不報錯
+    const activateCloudSync = () => {
+        showToast("新版系統已自動啟用，無需手動激活", "success");
+    };
+
+    // 3. 還原邏輯：橋接至你新版 SettingsView 的還原機制，防止按鈕失效
+    const syncFromCloud = async () => {
+        // 先幫你檢查有沒有填寫必要欄位
+        const shopID = settings.shopID?.trim();
+        const syncToken = settings.syncToken?.trim();
+        const DEFAULT_PROJECT_ID = "salonpos-system";
+
+        if (!shopID || !syncToken) {
+            showToast("請先確認設定頁面的店號與金鑰已填寫", "error");
             return;
         }
 
+        if (!confirm(`確定要從雲端 Firestore 還原嗎？\n這將覆蓋此裝置上的所有資料！`)) return;
+
         try {
-            // 激活時立刻進行 PUT 上傳，這會在 Firebase 後台直接建立資料夾
-            const url = `https://${cloudKey}.firebasedatabase.app/SalonPOS/${syncToken}.json`;
-            const backupData = { 
-                services, 
-                stylists, 
-                customers, 
-                transactions, 
-                settings: { ...safeSettings, isActivated: true }, // 標記為激活狀態
-                inventoryLogs, 
-                expenses,
-                lastUpdated: new Date().toISOString()
-            };
+            showToast("正在從雲端下載...", "loading");
+            // 走最新、最正確的獨立專案 Firestore 路徑
+            const url = `https://firestore.googleapis.com/v1/projects/${DEFAULT_PROJECT_ID}/databases/(default)/documents/SalonPOS/${shopID}/Tokens/${syncToken}`;
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("找不到雲端備份");
+            
+            const result = await response.json();
 
-            const response = await fetch(url, {
-                method: 'PUT',
-                body: JSON.stringify(backupData)
-            });
-
-            if (response.ok) {
-                setSettings({ ...safeSettings, isActivated: true });
-                showToast("系統激活成功！雲端存檔已連動");
+            if (result && result.fields && result.fields.content) {
+                const data = JSON.parse(result.fields.content.stringValue);
+                
+                if (data.services) setServices(data.services);
+                if (data.stylists) setStylists(data.stylists);
+                if (data.customers) setCustomers(data.customers);
+                if (data.transactions) setTransactions(data.transactions);
+                if (data.inventoryLogs) setInventoryLogs(data.inventoryLogs);
+                if (data.expenses) setExpenses(data.expenses);
+                if (data.settings) setSettings(data.settings);
+                
+                showToast("✅ 雲端還原成功！");
+                setTimeout(() => window.location.reload(), 1000);
             } else {
-                throw new Error();
+                showToast("❌ 雲端找不到資料，請確認店號與金鑰", "error");
             }
         } catch (err) {
-            showToast("激活失敗，請檢查 Firebase ID 或網路", "error");
+            console.error(err);
+            showToast("❌ 讀取失敗，請確認店號與金鑰是否正確", "error");
         }
     };
 
-    // --- 3. 雲端下載還原 (完整保留您原本的所有恢復邏輯) ---
-   const syncFromCloud = async () => {
-    const { cloudKey, syncToken } = settings;
-    if (!syncToken || !cloudKey) {
-        showToast("請先確認金鑰與鑰匙已填寫", "error");
-        return;
-    }
-
-    if (!confirm(`確定要從 Firestore 還原嗎？\n這將覆蓋此裝置上的所有資料！`)) return;
-
-    try {
-        showToast("正在從雲端下載...", "loading");
-        // 【關鍵修正】：Firestore 的下載路徑
-        const url = `https://firestore.googleapis.com/v1/projects/${cloudKey.trim()}/databases/(default)/documents/SalonPOS/${syncToken.trim()}`;
-        
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (result && result.fields && result.fields.content) {
-            // 解析回原本的 JSON 格式
-            const data = JSON.parse(result.fields.content.stringValue);
-            
-            if (data.services) setServices(data.services);
-            if (data.stylists) setStylists(data.stylists);
-            if (data.customers) setCustomers(data.customers);
-            if (data.transactions) setTransactions(data.transactions);
-            if (data.inventoryLogs) setInventoryLogs(data.inventoryLogs);
-            if (data.expenses) setExpenses(data.expenses);
-            if (data.settings) setSettings(data.settings);
-            
-            showToast("✅ 雲端還原成功！");
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showToast("❌ 雲端找不到資料，請確認金鑰", "error");
-        }
-    } catch (err) {
-        showToast("讀取失敗，請檢查網路", "error");
-    }
-};
-  // --- 4. 雲端備份邏輯 (Firestore 台灣機房專用版) ---
-const syncToCloud = async () => {
-    // 這裡會抓取你在設定頁面「確認」後存進去的 cloudKey
-    const { cloudKey, syncToken } = settings;
-
-    // 檢查有沒有填 ID，沒填就不能建立
-    if (!cloudKey || !syncToken || cloudKey === '你的Firebase專案ID') {
-        showToast("請先在設定填寫正確的 Firebase ID 並按確認", "error");
-        return;
-    }
-
-    try {
-        showToast("正在建立雲端空間並同步...", "loading");
-        
-        // Firestore 自動建立的關鍵：路徑指向 /SalonPOS/你的金鑰
-        const url = `https://firestore.googleapis.com/v1/projects/${cloudKey.trim()}/databases/(default)/documents/SalonPOS/${syncToken.trim()}?updateMask.fieldPaths=content`;
-        
-        const backupData = {
-            fields: {
-                content: {
-                    stringValue: JSON.stringify({
-                        services,
-                        stylists,
-                        customers,
-                        transactions,
-                        settings,
-                        inventoryLogs,
-                        expenses,
-                        lastUpdated: new Date().toISOString()
-                    })
-                }
-            }
-        };
-
-        const response = await fetch(url, {
-            method: 'PATCH', // 自動建立資料夾的關鍵動詞
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(backupData)
-        });
-
-        if (response.ok) {
-            showToast("✅ 雲端空間已建立並備份成功！");
-        } else {
-            const err = await response.json();
-            console.error("Firestore Error:", err);
-            // 這裡如果失敗，通常是 Rules 沒開 (403) 或 ID 打錯 (404)
-            showToast(`❌ 失敗: ${err.error?.status || '請檢查ID與規則'}`, "error");
-        }
-    } catch (err) {
-        console.error("Network Error:", err);
-        showToast("❌ 連線異常", "error");
-    }
-};
     
     // Fallback for missing settings if loading from old data
             const safeSettings = {
@@ -904,7 +821,23 @@ const handleUpdateOrder = (updatedOrder) => {
                                                 <tr><th className="p-5 sticky left-0 bg-white">設計師</th><th className="p-5 text-right">技術業績</th><th className="p-5 text-right">販賣業績</th><th className="p-5 text-right text-indigo-600">抽成總額</th><th className="p-5 text-right">底薪+津貼</th><th className="p-5 text-right text-rose-500">借支扣款</th><th className="p-5 text-right font-black bg-indigo-50/50">實領薪資</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {salaryReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-5 font-bold text-slate-800 sticky left-0 bg-white">{s.name} <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-2">{s.role}</span></td><td className="p-5 text-right text-slate-600">{formatCurrency(s.serviceRevenue)}</td><td className="p-5 text-right text-slate-600">{formatCurrency(s.productRevenue)}</td><td className="p-5 text-right font-bold text-indigo-600">{formatCurrency(s.totalCommission)}</td><td className="p-5 text-right text-slate-600">{formatCurrency((s.baseSalary||0) + (s.bonuses||0))}</td><td className="p-5 text-right text-rose-500 font-bold">-{formatCurrency(s.advanceTotal)}</td><td className="p-5 text-right font-black text-lg bg-indigo-50/30 text-slate-800">{formatCurrency(s.totalSalary)}</td></tr>))}
+                                               
+                                         {salaryReport.map(s => (
+                                                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-5 font-bold text-slate-800 sticky left-0 bg-white">
+                                                            {s.name} <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-2">{s.role}</span>
+                                                        </td>
+                                                        <td className="p-5 text-right text-slate-600">{formatCurrency(s.serviceRevenue)}</td>
+                                                        <td className="p-5 text-right text-slate-600">{formatCurrency(s.productRevenue)}</td>
+                                                        <td className="p-5 text-right font-bold text-indigo-600">{formatCurrency(s.totalCommission)}</td>
+                                                        
+                                                        {/* 💡 核心修正：正確加總底薪、職務加給與全勤獎金 */}
+                                                        <td className="p-5 text-right text-slate-600">{formatCurrency((s.baseSalary||0) + (s.positionBonus||0) + (s.attendanceBonus||0))}</td>
+                                                        
+                                                        <td className="p-5 text-right text-rose-500 font-bold">-{formatCurrency(s.advanceTotal)}</td>
+                                                        <td className="p-5 text-right font-black text-lg bg-indigo-50/30 text-slate-800">{formatCurrency(s.totalSalary)}</td>
+                                                    </tr>
+                                                ))}
                                             </tbody>
                                         </table>
                                     </div>
@@ -925,7 +858,6 @@ const handleUpdateOrder = (updatedOrder) => {
                                 </div>
                             </div>
                         )}
-
                         {view === 'expense' && (
                             <div className="space-y-6 animate-fade-in">
                                 <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
@@ -1264,475 +1196,522 @@ const handleUpdateOrder = (updatedOrder) => {
                 );
             };
 
-        // [POS View] (v19.0 旗艦完美修復版 - 會員連動與精準開單)
-const POSView = () => {
-    const [cart, setCart] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('全部');
-    const [selectedStylist, setSelectedStylist] = useState(safeStylists[0]?.id || '');
-    const [selectedAssistant, setSelectedAssistant] = useState('');
-    const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [custSearch, setCustSearch] = useState('');
-    const [adHocCustomerName, setAdHocCustomerName] = useState('');
-    const [adHocGender, setAdHocGender] = useState('女');
-    const [showCheckout, setShowCheckout] = useState(false);
-    const [showPending, setShowPending] = useState(false);
-    const [checkoutDate, setCheckoutDate] = useState(getCurrentDateTimeLocal());
-    const [isAddingCustomer, setIsAddingCustomer] = useState(false);
 
-    const getCategoryColor = (cat) => {
-        const themeKey = safeSettings.categoryColors[cat] || 'slate';
-        return getThemeClasses(themeKey, 'card');
-    };
 
-    const handleMainStylistChange = (e) => {
-        const newStylistId = e.target.value;
-        setSelectedStylist(newStylistId);
-        const stylistObj = safeStylists.find(s => s.id === newStylistId);
-        const stylistName = stylistObj ? stylistObj.name : '未指定';
 
-        if (cart.length > 0) {
-            const updatedCart = cart.map(item => ({
-                ...item,
-                stylistId: newStylistId,
-                stylistName: stylistName
-            }));
-            setCart(updatedCart);
-            showToast(`已將所有項目同步為：${stylistName}`);
-        }
-    };
+        // [POS View] (v19.5 旗艦完美防護版 - 直擊人心會員連動修正版)
+        const POSView = () => {
+            const [cart, setCart] = useState([]);
+            const [selectedCategory, setSelectedCategory] = useState('全部');
+            const [selectedStylist, setSelectedStylist] = useState(safeStylists[0]?.id || '');
+            const [selectedAssistant, setSelectedAssistant] = useState('');
+            const [selectedCustomer, setSelectedCustomer] = useState(null);
+            const [custSearch, setCustSearch] = useState('');
+            const [adHocCustomerName, setAdHocCustomerName] = useState('');
+            const [adHocGender, setAdHocGender] = useState('女');
+            const [showCheckout, setShowCheckout] = useState(false);
+            const [showPending, setShowPending] = useState(false);
+            const [checkoutDate, setCheckoutDate] = useState(getCurrentDateTimeLocal());
+            const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+            
+            const getCategoryColor = (cat) => {
+                const themeKey = safeSettings.categoryColors[cat] || 'slate';
+                return getThemeClasses(themeKey, 'card');
+            };
 
-    // 精準過濾會員：當輸入框有字時才觸過濾
-    const filteredCustomers = useMemo(() => {
-        if (!custSearch.trim()) return [];
-        return safeCustomers.filter(c => 
-            (c.name || '').includes(custSearch.trim()) || (c.phone || '').includes(custSearch.trim())
-        );
-    }, [safeCustomers, custSearch]);
+            const handleMainStylistChange = (e) => {
+                const newStylistId = e.target.value;
+                setSelectedStylist(newStylistId);
+                const stylistObj = safeStylists.find(s => s.id === newStylistId);
+                const stylistName = stylistObj ? stylistObj.name : '未指定';
 
-    const filteredServices = useMemo(() => {
-        let items = safeServices.filter(s => !s.isInternal);
-        if (selectedCategory !== '全部') items = items.filter(s => s.category === selectedCategory);
-        return items;
-    }, [safeServices, selectedCategory]);
+                if (cart.length > 0) {
+                    const updatedCart = cart.map(item => ({
+                        ...item,
+                        stylistId: newStylistId,
+                        stylistName: stylistName
+                    }));
+                    setCart(updatedCart);
+                    showToast(`已將所有項目同步為：${stylistName}`);
+                }
+            };
 
-    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price - (item.discount||0)), 0), [cart]);
+            // 精準過濾會員：當輸入框有字時才觸過濾
+            const filteredCustomers = useMemo(() => {
+                if (!custSearch.trim()) return [];
+                return safeCustomers.filter(c => 
+                    (c.name || '').includes(custSearch.trim()) || (c.phone || '').includes(custSearch.trim())
+                );
+            }, [safeCustomers, custSearch]);
 
-    const addToCart = (service) => {
-        if (service.isProduct && service.stock !== null) {
-            const inCart = cart.filter(i => i.id === service.id).length;
-            if ((service.stock - inCart) <= 0) { showToast('庫存不足！', 'error'); return; }
-        }
-        const stylistObj = safeStylists.find(s => s.id === selectedStylist);
-        const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
+            const filteredServices = useMemo(() => {
+                let items = safeServices.filter(s => !s.isInternal);
+                if (selectedCategory !== '全部') items = items.filter(s => s.category === selectedCategory);
+                return items;
+            }, [safeServices, selectedCategory]);
+
+            const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price - (item.discount||0)), 0), [cart]);
+
+            const addToCart = (service) => {
+                if (service.isProduct && service.stock !== null) {
+                    const inCart = cart.filter(i => i.id === service.id).length;
+                    if ((service.stock - inCart) <= 0) { showToast('庫存不足！', 'error'); return; }
+                }
+                const stylistObj = safeStylists.find(s => s.id === selectedStylist);
+                const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
+                
+                setCart([...cart, { 
+                    cartId: generateId(), 
+                    id: service.id, 
+                    name: service.name, 
+                    price: service.price, 
+                    cost: service.cost || 0, 
+                    category: service.category, 
+                    stock: service.stock, 
+                    isProduct: service.isProduct, 
+                    stylistId: selectedStylist, 
+                    stylistName: stylistObj?.name || '未指定', 
+                    assistantId: selectedAssistant, 
+                    assistantName: assistantObj?.name || '', 
+                    isDesignated: true, 
+                    discount: 0 
+                }]);
+            };
+
+            const handlePendingOrder = () => {
+                if (cart.length === 0) return;
+                const custName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
+                const note = prompt('掛單備註 (例如: 染髮等待中)');
+                if (note === null) return;
+                setPendingOrders([...safePendingOrders, { id: generateId(), time: new Date().toISOString(), cart, selectedCustomer, adHocCustomerName, note, custName }]);
+                setCart([]); setSelectedCustomer(null); setAdHocCustomerName(''); showToast('已掛單暫存');
+            };
+
+            const restoreOrder = (o) => {
+                setCart(o.cart); 
+                setSelectedCustomer(o.selectedCustomer); 
+                setAdHocCustomerName(o.adHocCustomerName || '');
+                setPendingOrders(safePendingOrders.filter(x => x.id !== o.id));
+                setShowPending(false); 
+                showToast('單據已取出');
+            };
+
+            const handleCheckout = (paymentMethod) => {
+                if (cart.length === 0) return;
+                
+               const finalCustName = selectedCustomer ? (selectedCustomer.Name || selectedCustomer.name) : (adHocCustomerName || '散客');
+const finalCustId = selectedCustomer ? selectedCustomer.id : null;
+const finalGender = selectedCustomer ? (selectedCustomer.Gender || selectedCustomer.gender) : adHocGender;
+
+                const newOrder = { 
+                    id: generateId(), 
+                    date: new Date(checkoutDate).toISOString(), 
+                    items: cart, 
+                    total: cartTotal, 
+                    paymentMethod, 
+                    mainStylistId: selectedStylist, 
+                    customerId: finalCustId,      
+                    customerName: finalCustName,  
+                    customerGender: finalGender,
+                    createdAt: new Date().toISOString() 
+                };
+
+                const updatedServices = safeServices.map(s => {
+                    const cartItems = cart.filter(i => i.id === s.id);
+                    if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
+                        return { ...s, stock: Math.max(0, s.stock - cartItems.length) }; 
+                    }
+                    return s;
+                });
+                setServices(updatedServices);
+                
+                const newLogs = cart.filter(i=>i.isProduct).map(i=>({ id: generateId(), date: new Date().toISOString(), type: '銷售', itemName: i.name, qty: 1, cost: i.cost, note: `訂單 #${newOrder.id.slice(0,6)}`, operator: 'System' }));
+                setInventoryLogs([...newLogs, ...safeInventoryLogs]);
+
+                if (finalCustId) {
+                    setCustomers(prevCustomers => prevCustomers.map(c => 
+                        c.id === finalCustId ? { ...c, visits: (c.visits || 0) + 1, totalSpend: (c.totalSpend || 0) + cartTotal } : c
+                    ));
+                }
+
+                setTransactions([newOrder, ...safeTransactions]);
+                setCart([]); 
+                setSelectedCustomer(null); 
+                setAdHocCustomerName(''); 
+                setShowCheckout(false); 
+                
+                if (safeSettings.autoBackup) {
+                    setTimeout(() => {
+                        try {
+                            const backupData = { services: updatedServices, stylists: safeStylists, customers: safeCustomers, transactions: [newOrder, ...safeTransactions], settings: safeSettings, inventoryLogs: [...newLogs, ...safeInventoryLogs], expenses: safeExpenses };
+                            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = "salon_backup_auto.json";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                        } catch(e) { console.error(e); }
+                    }, 1000);
+                }
+
+                if (finalCustId) {
+                    showToast(`💰 結帳開單成功！已計入會員【${finalCustName || '會員'}】消費`);
+                } else {
+                    showToast('💰 結帳開單成功！（現場散客單）');
+                }
+            };
+
+            return (
+                <div className="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden relative">
+                    {isAddingCustomer && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl"><h3 className="font-bold text-lg">快速新增顧客</h3><QuickCustomerForm stylists={safeStylists} onSave={(data) => { const newCust = { id: generateId(), ...data, visits: 0, totalSpend: 0, tags: [] }; setCustomers([...safeCustomers, newCust]); setSelectedCustomer(newCust); setIsAddingCustomer(false); }} onCancel={() => setIsAddingCustomer(false)}/></div></div>}
+                    
+                    {showPending && (
+                        <Modal title="暫存單據 (掛單)" onClose={()=>setShowPending(false)} size="max-w-lg">
+                            {safePendingOrders.length === 0 ? <p className="text-center text-slate-400 py-4">無暫存單據</p> : safePendingOrders.map(o => (
+                                <div key={o.id} className="border p-3 rounded-xl flex justify-between items-center bg-slate-50 mb-2">
+                                    <div><div className="font-bold text-slate-800">{o.custName} <span className="text-xs font-normal text-slate-500">({new Date(o.time).toLocaleTimeString()})</span></div><div className="text-sm text-slate-600">{o.note}</div></div>
+                                    <div className="flex gap-2"><button onClick={()=>confirmAction('刪除掛單', '確定？', ()=>setPendingOrders(safePendingOrders.filter(x=>x.id!==o.id)))} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+                                    <button onClick={() => restoreOrder(o)} className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"><PlayCircle size={18}/> 取單</button>                                                 </div>
+                                </div>
+                            ))}
+                        </Modal>
+                    )}
+
+                    {showCheckout && (
+                        <Modal title="確認結帳收款" onClose={() => setShowCheckout(false)} size="max-w-sm">
+                            <div className="space-y-4 text-center">
+                                <div className="bg-slate-50 p-4 rounded-xl border">
+                                    <span className="text-xs text-slate-400 font-bold block mb-1">應收總金額</span>
+                                    <span className="text-3xl font-black text-indigo-600 font-mono">{formatCurrency(cartTotal)}</span>
+                                </div>
+                                <div className="text-left text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border space-y-1">
+                                    <div>客名：<span className="font-bold text-slate-700">{selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客')}</span></div>
+                                    <div>主設計師：<span className="font-bold text-slate-700">{safeStylists.find(s=>s.id===selectedStylist)?.name || '未指定'}</span></div>
+                                </div>
+                                <div className="space-y-2 pt-2">
+                                    <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {['現金', '信用卡', '街口支付', 'LINE Pay'].map(method => (
+                                            <button 
+                                                key={method} 
+                                                onClick={() => handleCheckout(method)}
+                                                className="py-3 rounded-xl border font-bold text-slate-700 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                            >
+                                                {method === '現金' ? <Banknote size={16} className="text-emerald-500"/> : <CreditCard size={16} className="text-indigo-500"/>}
+                                                {method}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowCheckout(false)} className="btn btn-secondary w-full py-2.5 mt-2 text-sm">取消返回</button>
+                            </div>
+                        </Modal>
+                    )}
+
+                    {/* 左側主面板：搜尋與項目選單 */}
+                    <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b space-y-3 bg-white">
+                            <div className="flex flex-col md:flex-row gap-2 items-center relative">
+                                {/* 會員搜尋核心輸入框 */}
+                                <div className="relative w-full flex-1" id="pos-member-search-box">
+                                    <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
+                                    <input 
+                                        type="text" 
+                                        className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all font-medium" 
+                                        placeholder="🔍 輸入會員姓名或電話，立刻搜尋並連動開單..." 
+                                        value={custSearch} 
+                                        onChange={e => setCustSearch(e.target.value)}
+                                    />
+                                    {custSearch && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => setCustSearch('')}
+                                            className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
+                                        >
+                                            <X size={16}/>
+                                        </button>
+                                    )}
+
+                                    {/* 下拉選單區塊 */}
+                                    {custSearch && filteredCustomers.length > 0 && (
+                                        <div 
+                                            id="pos-member-dropdown"
+                                            tabIndex={-1}
+                                            className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto divide-y divide-slate-100 outline-none"
+                                        >
+                                            {filteredCustomers.map(c => (
+<div 
+    key={c.id}
+    onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         
-        if (selectedCustomer && !adHocCustomerName) {
-            setAdHocCustomerName(selectedCustomer.name);
-        }
-
-        setCart([...cart, { 
-            cartId: generateId(), 
-            id: service.id, 
-            name: service.name, 
-            price: service.price, 
-            cost: service.cost || 0, 
-            category: service.category, 
-            stock: service.stock, 
-            isProduct: service.isProduct, 
-            stylistId: selectedStylist, 
-            stylistName: stylistObj?.name || '未指定', 
-            assistantId: selectedAssistant, 
-            assistantName: assistantObj?.name || '', 
-            isDesignated: true, 
-            discount: 0 
-        }]);
-    };
-
-    const handlePendingOrder = () => {
-        if (cart.length === 0) return;
-        const custName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
-        const note = prompt('掛單備註 (例如: 染髮等待中)');
-        if (note === null) return;
-        setPendingOrders([...safePendingOrders, { id: generateId(), time: new Date().toISOString(), cart, selectedCustomer, adHocCustomerName, note, custName }]);
-        setCart([]); setSelectedCustomer(null); setAdHocCustomerName(''); showToast('已掛單暫存');
-    };
-
-    const restoreOrder = (o) => {
-        setCart(o.cart); 
-        setSelectedCustomer(o.selectedCustomer); 
-        setAdHocCustomerName(o.adHocCustomerName || '');
-        setPendingOrders(safePendingOrders.filter(x => x.id !== o.id));
-        setShowPending(false); 
-        showToast('單據已取出');
-    };
-
-    const handleCheckout = (paymentMethod) => {
-        if (cart.length === 0) return;
+      // ⚡ 直接戳當前 POSView 的大腦，精緻塞入客資！
+setSelectedCustomer(c); // 🚀 直接把帶有大寫 Name 和 Phone 的原始會員物件塞進去！
+setAdHocCustomerName('');
+setAdHocGender(c.Gender || c.gender || '女');
         
-        const finalCustName = selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客');
-        const finalCustId = selectedCustomer ? selectedCustomer.id : null;
-        const finalGender = selectedCustomer ? selectedCustomer.gender : adHocGender;
+if (c.preferredStylistId) {
+            setSelectedStylist(c.preferredStylistId);
+        }
+        
+        setCustSearch(''); // 點完後立刻清空搜尋，讓下拉清單完美收合
+        showToast(`已成功連動正式會員：${finalMemberData.name}`);
+    }}
+    className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
+>                                                    <div>
+                                                        <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
+                                                        <span className="text-xs text-slate-400 font-mono block mt-0.5">📱 {c.phone}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono block">來店: {c.visits || 0}次</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
-        const newOrder = { 
-            id: generateId(), 
-            date: new Date(checkoutDate).toISOString(), 
-            items: cart, 
-            total: cartTotal, 
-            paymentMethod, 
-            mainStylistId: selectedStylist, 
-            customerId: finalCustId, 
-            customerName: finalCustName,
-            customerGender: finalGender,
-            createdAt: new Date().toISOString() 
+                                {/* 右側狀態顯示分流 */}
+                                <div className="flex gap-2 w-full md:w-auto items-center">
+                                    {selectedCustomer ? (
+                                        <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-200 px-3 py-2 rounded-xl text-sm font-semibold text-indigo-700 shadow-sm animate-fade-in">
+                                            <span>👤 {selectedCustomer.name}</span>
+                                            <span className="text-xs bg-indigo-200/60 text-indigo-800 px-1.5 py-0.5 rounded-md font-normal">正式會員</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedCustomer(null);
+                                                    setAdHocCustomerName('');
+                                                }}
+                                                className="ml-1 text-indigo-400 hover:text-rose-500 transition-colors font-bold text-base p-0.5"
+                                                title="解除連動"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="relative flex items-center">
+                                            <input 
+                                                type="text" 
+                                                className="w-36 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all placeholder-slate-400" 
+                                                placeholder="手動輸入散客..." 
+                                                value={adHocCustomerName} 
+                                                onChange={e => setAdHocCustomerName(e.target.value)}
+                                            />
+                                            <span className="absolute left-2.5 text-xs text-slate-400">👤</span>
+                                        </div>
+                                    )}
+
+                                    <select 
+                                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                                        value={selectedCustomer ? (selectedCustomer.gender || '女') : adHocGender} 
+                                        onChange={e => {
+                                            if (selectedCustomer) {
+                                                setSelectedCustomer(null);
+                                                setAdHocCustomerName('');
+                                            }
+                                            setAdHocGender(e.target.value);
+                                        }}
+                                    >
+                                        <option value="女">女生 👩‍🦰</option>
+                                        <option value="男">男生 👨</option>
+                                        <option value="兒童">兒童 👶</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                                {filteredServices.map(s => { 
+                                    const inCartCount = cart.filter(i => i.id === s.id).length; 
+                                    const remaining = s.stock !== null ? s.stock - inCartCount : null; 
+                                    const noStock = remaining !== null && remaining <= 0; 
+                                    const colorClass = getCategoryColor(s.category);
+                                    
+                                    return (
+                                        <button key={s.id} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
+                                            <div className="flex justify-between mb-2">
+                                                <span className="text-[10px] bg-white/80 px-2 py-0.5 rounded text-slate-500 font-bold backdrop-blur-sm">{s.category}</span>
+                                                {remaining !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${remaining<=5?'bg-red-100 text-red-500':'bg-emerald-100 text-emerald-600'}`}>存 {remaining}</span>}
+                                            </div>
+                                            <h3 className="font-bold text-slate-800 mb-1 truncate text-lg">{s.name}</h3>
+                                            <div className="text-slate-700 font-black text-lg">{formatCurrency(s.price)}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 右側面板：結帳清單 */}
+                    <div className="w-full lg:w-96 bg-white rounded-2xl shadow-xl flex flex-col h-[45vh] lg:h-full border border-slate-200">
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50/50">
+                            <span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span>
+                            <div className="flex gap-2">
+                                <button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button>
+                                <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span>
+                            </div>
+                        </div>
+                        
+                        {/* 開單顧客顯示卡片 */}
+                        <div className="px-4 pt-3">
+                            <label className="text-xs font-bold text-slate-400 mb-1 block">當前開單顧客</label>
+                            
+                        {selectedCustomer && (selectedCustomer.name || selectedCustomer.Name) ? (
+    /* 💎 正式會員高質感藍紫色卡片 */
+    <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 border border-indigo-400 p-4 rounded-xl flex justify-between items-center shadow-md text-white animate-fade-in w-full">
+        <div className="flex-1 min-w-0">
+           <div className="font-black flex items-center gap-1.5 text-base text-white">
+    {/* 🚀 精準修正為大寫屬性，讓資料完美通電顯示 */}
+    <span>👤 會員姓名：{selectedCustomer.Name || selectedCustomer.name || '未知會員'}</span>
+    <span className="text-[10px] bg-white text-indigo-600 px-2 py-0.5 rounded-md font-bold shadow-sm">正式會員</span>
+</div>
+<div className="text-xs text-indigo-100 font-mono mt-1">
+    📱 會員電話：{selectedCustomer.Phone || selectedCustomer.phone || '無電話紀錄'}
+</div>
+<div className="text-[10px] text-indigo-200 mt-0.5">
+    歷史消費: {formatCurrency(selectedCustomer.TotalSpend || selectedCustomer.totalSpend || 0)} ({selectedCustomer.Visits || selectedCustomer.visits || 0}次)
+</div>
+        </div>
+        ...
+                                    <button 
+                                        type="button"
+                                        onClick={(e) => { 
+                                            e.preventDefault();
+                                            setSelectedCustomer(null); 
+                                            setAdHocCustomerName('');
+                                            showToast('已解除會員連動，恢復散客單'); 
+                                        }} 
+                                        className="w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center font-bold shadow-sm transition-all active:scale-90 text-sm ml-2 flex-shrink-0"
+                                        title="解除連動"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex justify-between items-center shadow-sm animate-fade-in w-full">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                                            🚶 {adHocCustomerName && adHocCustomerName.trim() ? `現場散客：${adHocCustomerName.trim()}` : '現場散客單 (未指名)'}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 mt-1">
+                                            {adHocCustomerName && adHocCustomerName.trim() ? "✨ 純散客開單（不計入會員）" : "提示：可在左側搜尋框輸入直接連動正式會員客資"}
+                                        </div>
+                                    </div>
+                                    {adHocCustomerName && adHocCustomerName.trim() && (
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => { 
+                                                e.preventDefault();
+                                                setAdHocCustomerName(''); 
+                                                showToast('已清空散客姓名'); 
+                                            }} 
+                                            className="font-bold text-slate-300 hover:text-red-500 px-2 transition-colors text-base"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
+                        
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                            {cart.map((item, idx) => {
+                                const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
+                                const itemBorderClass = getThemeClasses(catColorKey, 'accent');
+
+                                return (
+                                    <div key={item.cartId || idx} className={`p-3 border border-slate-200 rounded-xl relative group bg-white hover:border-indigo-300 transition-all border-l-4 ${itemBorderClass}`}>
+                                        <div className="flex justify-between font-bold text-sm mb-1">
+                                            <span className="text-slate-800">{item.name}</span>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-slate-700 font-black font-mono">
+                                                    {formatCurrency(item.price)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="text-xs text-slate-500 flex justify-between items-center mt-2">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="flex items-center gap-1">
+                                                    <User size={10}/> {item.stylistName || '未指定'} 
+                                                    <span className={`ml-1 px-1 rounded text-[10px] ${item.isDesignated ? 'bg-rose-100 text-rose-600':'bg-gray-100 text-gray-500'}`}>
+                                                        {item.isDesignated ? '指定' : '不指定'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="flex gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const val = prompt(`請輸入 [${item.name}] 要變更的結帳售價:`, item.price);
+                                                        if (val === null) return;
+                                                        
+                                                        const newPrice = Number(val);
+                                                        if (isNaN(newPrice) || newPrice < 0) {
+                                                            showToast('請輸入正確的數字金額', 'error');
+                                                            return;
+                                                        }
+
+                                                        const newCart = [...cart];
+                                                        newCart[idx].price = newPrice;
+                                                        setCart(newCart);
+                                                        showToast('實收金額已更新');
+                                                    }} 
+                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                    title="變更此單售價"
+                                                >
+                                                    <Edit size={14}/>
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (confirm(`確定要從結帳清單中移除 [${item.name}] 嗎？`)) {
+                                                            setCart(cart.filter((_, i) => i !== idx));
+                                                            showToast('項目已移除');
+                                                        }
+                                                    }} 
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="移除此項目"
+                                                >
+                                                    <Trash2 size={14}/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}
+                        </div>
+
+                        <div className="p-4 border-t bg-white rounded-b-2xl">
+                            <div className="flex justify-between items-end mb-4"><span className="text-slate-500 font-bold">總計</span><span className="text-3xl font-black text-slate-800">{formatCurrency(cartTotal)}</span></div>
+                            <div className="space-y-3 mb-4">
+                                <div className="flex items-center gap-2 w-full">
+                                    <span className="text-sm font-bold text-slate-500 w-14 text-right">主操作:</span>
+                                    <select className="input-field py-2" value={selectedStylist} onChange={handleMainStylistChange}>
+                                        {safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-2 w-full">
+                                    <span className="text-sm font-bold text-slate-500 w-14 text-right">協助:</span>
+                                    <select className="input-field py-2" value={selectedAssistant} onChange={e => setSelectedAssistant(e.target.value)}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+                                </div>
+                            </div>
+                            <div className="flex gap-2"><button onClick={handlePendingOrder} disabled={cart.length === 0} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50">挂單</button><button onClick={() => setShowCheckout(true)} disabled={cart.length === 0} className="flex-[2] btn-primary py-3 rounded-xl font-bold shadow-lg disabled:opacity-50">結帳收款</button></div>
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
-        const updatedServices = safeServices.map(s => {
-            const cartItems = cart.filter(i => i.id === s.id);
-            if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
-                return { ...s, stock: Math.max(0, s.stock - cartItems.length) }; 
-            }
-            return s;
-        });
-        setServices(updatedServices);
-        
-        const newLogs = cart.filter(i=>i.isProduct).map(i=>({ id: generateId(), date: new Date().toISOString(), type: '銷售', itemName: i.name, qty: 1, cost: i.cost, note: `訂單 #${newOrder.id.slice(0,6)}`, operator: 'System' }));
-        setInventoryLogs([...newLogs, ...safeInventoryLogs]);
-
-        // 【核心連動邏輯】開單儲存時，精準寫入客資累計數據
-        if (selectedCustomer) {
-            setCustomers(safeCustomers.map(c => c.id === selectedCustomer.id ? { ...c, visits: (c.visits || 0) + 1, totalSpend: (c.totalSpend || 0) + cartTotal } : c));
-        }
-
-        setTransactions([newOrder, ...safeTransactions]);
-        setCart([]); 
-        setSelectedCustomer(null); 
-        setAdHocCustomerName(''); 
-        setShowCheckout(false); 
-        
-        if (safeSettings.autoBackup) {
-            setTimeout(() => {
-                try {
-                    const backupData = { services: updatedServices, stylists: safeStylists, customers: safeCustomers, transactions: [newOrder, ...safeTransactions], settings: safeSettings, inventoryLogs: [...newLogs, ...safeInventoryLogs], expenses: safeExpenses };
-                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = "salon_backup_auto.json";
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                } catch(e) { console.error(e); }
-            }, 1000);
-        }
-        showToast('💰 結帳開單成功！已計入會員消費');
-    };
-
-    return (
-        <div className="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden relative">
-            {isAddingCustomer && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl"><h3 className="font-bold text-lg">快速新增顧客</h3><QuickCustomerForm stylists={safeStylists} onSave={(data) => { const newCust = { id: generateId(), ...data, visits: 0, totalSpend: 0, tags: [] }; setCustomers([...safeCustomers, newCust]); setSelectedCustomer(newCust); setIsAddingCustomer(false); }} onCancel={() => setIsAddingCustomer(false)}/></div></div>}
-            
-            {showPending && (
-                <Modal title="暫存單據 (掛單)" onClose={()=>setShowPending(false)} size="max-w-lg">
-                    {safePendingOrders.length === 0 ? <p className="text-center text-slate-400 py-4">無暫存單據</p> : safePendingOrders.map(o => (
-                        <div key={o.id} className="border p-3 rounded-xl flex justify-between items-center bg-slate-50 mb-2">
-                            <div><div className="font-bold text-slate-800">{o.custName} <span className="text-xs font-normal text-slate-500">({new Date(o.time).toLocaleTimeString()})</span></div><div className="text-sm text-slate-600">{o.note}</div></div>
-                            <div className="flex gap-2"><button onClick={()=>confirmAction('刪除掛單', '確定？', ()=>setPendingOrders(safePendingOrders.filter(x=>x.id!==o.id)))} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
-                            <button onClick={() => restoreOrder(o)} className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"><PlayCircle size={18}/> 取單</button>                                         </div>
-                        </div>
-                    ))}
-                </Modal>
-            )}
-
-            {showCheckout && (
-                <Modal title="確認結帳收款" onClose={() => setShowCheckout(false)} size="max-w-sm">
-                    <div className="space-y-4 text-center">
-                        <div className="bg-slate-50 p-4 rounded-xl border">
-                            <span className="text-xs text-slate-400 font-bold block mb-1">應收總金額</span>
-                            <span className="text-3xl font-black text-indigo-600 font-mono">{formatCurrency(cartTotal)}</span>
-                        </div>
-                        <div className="text-left text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border space-y-1">
-                            <div>客名：<span className="font-bold text-slate-700">{selectedCustomer ? selectedCustomer.name : (adHocCustomerName || '散客')}</span></div>
-                            <div>主設計師：<span className="font-bold text-slate-700">{safeStylists.find(s=>s.id===selectedStylist)?.name || '未指定'}</span></div>
-                        </div>
-                        <div className="space-y-2 pt-2">
-                            <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {['現金', '信用卡', '街口支付', 'LINE Pay'].map(method => (
-                                    <button 
-                                        key={method} 
-                                        onClick={() => handleCheckout(method)}
-                                        className="py-3 rounded-xl border font-bold text-slate-700 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm flex items-center justify-center gap-1.5"
-                                    >
-                                        {method === '現金' ? <Banknote size={16} className="text-emerald-500"/> : <CreditCard size={16} className="text-indigo-500"/>}
-                                        {method}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <button onClick={() => setShowCheckout(false)} className="btn btn-secondary w-full py-2.5 mt-2 text-sm">取消返回</button>
-                    </div>
-                </Modal>
-            )}
-
-            {/* 左側主面板：搜尋與項目選單 */}
-            <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b space-y-3 bg-white">
-                    <div className="flex flex-col md:flex-row gap-2 items-center relative">
-                        {/* 🌟 會員搜尋核心輸入框 */}
-                        <div className="relative w-full flex-1">
-                            <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
-                            <input 
-                                type="text" 
-                                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all font-medium" 
-                                placeholder="🔍 輸入會員姓名或電話，立刻搜尋並連動開單..." 
-                                value={custSearch} 
-                                onChange={e => setCustSearch(e.target.value)}
-                            />
-                            {custSearch && (
-                                <button 
-                                    onClick={() => setCustSearch('')}
-                                    className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
-                                >
-                                    <X size={16}/>
-                                </button>
-                            )}
-
-                            {/* 🌟 核心修正：完美浮動式會員搜尋結果下拉選單 */}
-                            {filteredCustomers.length > 0 && (
-                                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto divide-y divide-slate-100">
-                                   
-                                  {/* 🌟 修正後的會員搜尋結果下拉選單事件 */}
-{filteredCustomers.map(c => (
-    <div 
-        key={c.id}
-        onMouseDown={(e) => {
-            e.preventDefault(); // 防止 input 的 blur 提早關閉選單
-            if (!c) return;
-            
-            // 關鍵核心：同時鎖定正式會員，並將散客即時輸入框強制清空/同步
-            setSelectedCustomer(c); 
-            setAdHocCustomerName(c.name || ''); // 這裡直接帶入會員姓名
-            setAdHocGender(c.gender || '女');
-            
-            // 自動連動指定設計師
-            if (c.preferredStylistId && safeStylists.some(s => s.id === c.preferredStylistId)) {
-                setSelectedStylist(c.preferredStylistId);
-            }
-            
-            setCustSearch(''); // 清空搜尋欄
-            showToast(`已成功連動會員：${c.name}`); 
-        }}
-        className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors group"
-    >
-        <div>
-            <span className="font-bold text-slate-800 group-hover:text-indigo-600">{c.name}</span>
-            <span className="text-xs text-slate-400 font-mono block mt-0.5">📱 {c.phone}</span>
-        </div>
-        <div className="text-right">
-            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono block">來店: {c.visits || 0}次</span>
-        </div>
-    </div>
-))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 散客備用即時輸入框 */}
-                        <div className="flex gap-2 w-full md:w-auto">
-                            {selectedCustomer ? (
-                                <div className="input-field py-2.5 bg-indigo-50 text-indigo-700 font-bold border-indigo-200 w-44 truncate">✨ 連動中：{selectedCustomer.name}</div>
-                            ) : (
-                                <input type="text" className="input-field w-28 py-2.5 bg-white" placeholder="散客姓名" value={adHocCustomerName} onChange={e => setAdHocCustomerName(e.target.value)}/>
-                            )}                                        
-                            <select className="input-field w-24 py-2.5 bg-white font-bold text-slate-700" value={adHocGender} onChange={e => setAdHocGender(e.target.value)} disabled={!!selectedCustomer}>
-                                <option value="女">女生</option>
-                                <option value="男">男生</option>
-                                <option value="兒童">兒童</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {filteredServices.map(s => { 
-                            const inCartCount = cart.filter(i => i.id === s.id).length; 
-                            const remaining = s.stock !== null ? s.stock - inCartCount : null; 
-                            const noStock = remaining !== null && remaining <= 0; 
-                            const colorClass = getCategoryColor(s.category);
-                            
-                            return (
-                                <button key={s.id} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
-                                    <div className="flex justify-between mb-2">
-                                        <span className="text-[10px] bg-white/80 px-2 py-0.5 rounded text-slate-500 font-bold backdrop-blur-sm">{s.category}</span>
-                                        {remaining !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${remaining<=5?'bg-red-100 text-red-500':'bg-emerald-100 text-emerald-600'}`}>存 {remaining}</span>}
-                                    </div>
-                                    <h3 className="font-bold text-slate-800 mb-1 truncate text-lg">{s.name}</h3>
-                                    <div className="text-slate-700 font-black text-lg">{formatCurrency(s.price)}</div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* 右側面板：結帳清單 */}
-            <div className="w-full lg:w-96 bg-white rounded-2xl shadow-xl flex flex-col h-[45vh] lg:h-full border border-slate-200">
-                <div className="p-4 border-b flex justify-between items-center bg-slate-50/50">
-                    <span className="font-bold flex items-center gap-2 text-slate-700"><Scissors size={18}/> 結帳清單</span>
-                    <div className="flex gap-2">
-                        <button onClick={()=>setShowPending(true)} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold flex items-center gap-1 hover:bg-indigo-200"><PauseCircle size={12}/> 取單 ({safePendingOrders.length})</button>
-                        <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span>
-                    </div>
-                </div>
-                
-            {/* 開單顧客顯示卡片 (完美獨立分流版) */}
-<div className="px-4 pt-3">
-    <label className="text-xs font-bold text-slate-400 mb-1 block">當前開單顧客</label>
-    
-    {selectedCustomer && selectedCustomer.id ? (
-        /* 👤 情況 A：只要點選了正式會員，百分之百強制獨立顯示高質感藍色會員卡 */
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 p-3.5 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
-            <div>
-                <div className="font-black text-indigo-900 flex items-center gap-1.5 text-base">
-                    👤 正式會員：{selectedCustomer.name} 
-                    <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-md font-bold">已連動</span>
-                </div>
-                <div className="text-xs text-indigo-500 font-mono mt-1">📱 電話：{selectedCustomer.phone || '無電話紀錄'}</div>
-            </div>
-            <button 
-                type="button"
-                onClick={(e) => { 
-                    e.preventDefault();
-                    setSelectedCustomer(null); 
-                    setAdHocCustomerName('');
-                    showToast('已解除會員連動，恢復散客單'); 
-                }} 
-                className="w-7 h-7 bg-white border border-indigo-100 rounded-full flex items-center justify-center font-bold text-slate-400 hover:text-red-500 shadow-sm transition-colors text-sm"
-                title="解除連動"
-            >
-                ✕
-            </button>
-        </div>
-    ) : (
-        /* 👥 情況 B：平常沒有點選會員時，乾淨簡單地顯示灰色散客現場單，絕不打架 */
-        <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex justify-between items-center shadow-sm">
-            <div>
-                <div className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
-                    🚶 {adHocCustomerName && adHocCustomerName.trim() ? `現場散客：${adHocCustomerName}` : '現場散客單 (未指名)'}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-1">
-                    提示：可在左側搜尋框輸入直接連動正式會員客資
-                </div>
-            </div>
-            {adHocCustomerName && adHocCustomerName.trim() && (
-                <button 
-                    type="button"
-                    onClick={(e) => { 
-                        e.preventDefault();
-                        setAdHocCustomerName(''); 
-                        showToast('已清空散客姓名'); 
-                    }} 
-                    className="font-bold text-slate-300 hover:text-red-500 px-2 transition-colors text-base"
-                >
-                    ✕
-                </button>
-            )}
-        </div>
-    )}
-</div>
-                <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
-                
-                <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                    {cart.map((item, idx) => {
-                        const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
-                        const itemBorderClass = getThemeClasses(catColorKey, 'accent');
-
-                        return (
-                            <div key={item.cartId || idx} className={`p-3 border border-slate-200 rounded-xl relative group bg-white hover:border-indigo-300 transition-all border-l-4 ${itemBorderClass}`}>
-                                <div className="flex justify-between font-bold text-sm mb-1">
-                                    <span className="text-slate-800">{item.name}</span>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-slate-700 font-black font-mono">
-                                            {formatCurrency(item.price)}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <div className="text-xs text-slate-500 flex justify-between items-center mt-2">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="flex items-center gap-1">
-                                            <User size={10}/> {item.stylistName || '未指定'} 
-                                            <span className={`ml-1 px-1 rounded text-[10px] ${item.isDesignated ? 'bg-rose-100 text-rose-600':'bg-gray-100 text-gray-500'}`}>
-                                                {item.isDesignated ? '指定' : '不指定'}
-                                            </span>
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="flex gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                            type="button"
-                                            onClick={() => {
-                                                const val = prompt(`請輸入 [${item.name}] 要變更的結帳售價:`, item.price);
-                                                if (val === null) return;
-                                                
-                                                const newPrice = Number(val);
-                                                if (isNaN(newPrice) || newPrice < 0) {
-                                                    showToast('請輸入正確的數字金額', 'error');
-                                                    return;
-                                                }
-
-                                                const newCart = [...cart];
-                                                newCart[idx].price = newPrice;
-                                                setCart(newCart);
-                                                showToast('實收金額已更新');
-                                            }} 
-                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                            title="變更此單售價"
-                                        >
-                                            <Edit size={14}/>
-                                        </button>
-                                        <button 
-                                            type="button"
-                                            onClick={() => {
-                                                if (confirm(`確定要從結帳清單中移除 [${item.name}] 嗎？`)) {
-                                                    setCart(cart.filter((_, i) => i !== idx));
-                                                    showToast('項目已移除');
-                                                }
-                                            }} 
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            title="移除此項目"
-                                        >
-                                            <Trash2 size={14}/>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                    {cart.length === 0 && <div className="text-center text-slate-400 py-10 flex flex-col items-center"><Scissors className="w-12 h-12 opacity-20 mb-2"/><p>尚未加入項目</p></div>}
-                </div>
-
-                <div className="p-4 border-t bg-white rounded-b-2xl">
-                    <div className="flex justify-between items-end mb-4"><span className="text-slate-500 font-bold">總計</span><span className="text-3xl font-black text-slate-800">{formatCurrency(cartTotal)}</span></div>
-                    <div className="space-y-3 mb-4">
-                        <div className="flex items-center gap-2 w-full">
-                            <span className="text-sm font-bold text-slate-500 w-14 text-right">主操作:</span>
-                            <select className="input-field py-2" value={selectedStylist} onChange={handleMainStylistChange}>
-                                {safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="flex items-center gap-2 w-full">
-                            <span className="text-sm font-bold text-slate-500 w-14 text-right">協助:</span>
-                            <select className="input-field py-2" value={selectedAssistant} onChange={e => setSelectedAssistant(e.target.value)}><option value="">無</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-                        </div>
-                    </div>
-                    <div className="flex gap-2"><button onClick={handlePendingOrder} disabled={cart.length === 0} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50">挂單</button><button onClick={() => setShowCheckout(true)} disabled={cart.length === 0} className="flex-[2] btn-primary py-3 rounded-xl font-bold shadow-lg disabled:opacity-50">結帳收款</button></div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
             // [StaffView] (v13.0 修正版：防崩潰 + 必填檢查)
             const StaffView = () => {
