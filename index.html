@@ -682,47 +682,43 @@ const EditOrderModal = ({ order, onClose, onSave }) => {
                     return stats;
                 }, [reportTx]);
 
-              const salaryReport = useMemo(() => {
+// 搜尋這行並替換整個 useMemo
+const salaryReport = useMemo(() => {
     return safeStylists.map(s => {
         let serviceRevenue = 0, productRevenue = 0, serviceCommission = 0, productCommission = 0;
         
-        reportTx.forEach(t => {
-            (t.items || []).forEach(item => {
-                if (item.stylistId === s.id) {
-                    const amount = (Number(item.price) || 0) - (Number(item.discount) || 0); // 實收金額 (售價 - 折扣)
-                    
-                    // --- 完美抽成核心邏輯 ---
-                    let base = amount;
-                    if (safeSettings.deductCostBeforeCommission) {
-                        // 將 item.cost 視為百分比 (例如 20 代表 20%)
-                        const costRate = Number(item.cost) || 0;
-                        const itemCost = amount * (costRate / 100); // 計算出該項目的店家管銷成本
-                        base = amount - itemCost; // 扣除成本後的「業績毛利底數」
+        // 確保 reportTx 有資料才跑迴圈，避免 undefined 錯誤
+        if (reportTx) {
+            reportTx.forEach(t => {
+                (t.items || []).forEach(item => {
+                    if (item.stylistId === s.id) {
+                        const amount = (Number(item.price) || 0) - (Number(item.discount) || 0);
+                        let base = amount;
+                        if (safeSettings.deductCostBeforeCommission) {
+                            const costRate = Number(item.cost) || 0;
+                            const itemCost = amount * (costRate / 100);
+                            base = amount - itemCost;
+                        }
+                        let rate = s.useGlobalCommission ? (safeSettings.commissionRates[item.category] || 0) : (s.commissionRate || 0);
+                        const comm = Math.round(base * (rate / 100));
+                        if (item.isProduct) { 
+                            productRevenue += amount; 
+                            productCommission += comm; 
+                        } else { 
+                            serviceRevenue += amount; 
+                            serviceCommission += comm; 
+                        }
                     }
-                    
-                    // 取得該項目分類的特定抽成率 (例如剪髮 40%、洗髮 30%)
-                    let rate = s.useGlobalCommission ? (safeSettings.commissionRates[item.category] || 0) : (s.commissionRate || 0);
-                    
-                    // 計算該項目設計師實得抽成
-                    const comm = Math.round(base * (rate / 100));
-                    
-                    if (item.isProduct) { 
-                        productRevenue += amount; 
-                        productCommission += comm; 
-                    } else { 
-                        serviceRevenue += amount; 
-                        serviceCommission += comm; 
-                    }
-                }
+                });
             });
-        });
+        }
         
-        const advanceTotal = reportExp.filter(e => e.type === '員工借支' && e.relatedStaffId === s.id).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        // 避免這裡產生 NaN
+        const advanceTotal = (reportExp || []).filter(e => e.type === '員工借支' && e.relatedStaffId === s.id).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
         const totalSalary = (Number(s.baseSalary)||0) + (Number(s.positionBonus)||0) + (Number(s.attendanceBonus)||0) + serviceCommission + productCommission - advanceTotal;
         return { ...s, serviceRevenue, productRevenue, totalCommission: serviceCommission+productCommission, advanceTotal, totalSalary };
     });
 }, [reportTx, reportExp, safeStylists, safeSettings]);
-
                 const categoryCountReport = useMemo(() => {
                     return safeStylists.map(s => {
                         const counts = {};
@@ -739,12 +735,26 @@ const EditOrderModal = ({ order, onClose, onSave }) => {
                     });
                 }, [reportTx, safeStylists, safeSettings]);
 
-                const addExpense = () => {
-                    if(!newExpense.amount) return;
-                    setExpenses([...safeExpenses, { id: generateId(), ...newExpense }]);
-                    setShowExpenseModal(false); setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
-                    showToast('支出已記錄');
-                };
+              const addExpense = () => {
+        // 1. 強制檢查金額是否存在且大於 0，防止寫入無效資料
+        const expenseAmount = Number(newExpense.amount);
+        if (!newExpense.amount || isNaN(expenseAmount) || expenseAmount <= 0) {
+            showToast('請輸入有效的金額', 'error');
+            return;
+        }
+
+        // 2. 將處理過的資料寫入
+        setExpenses([...safeExpenses, { 
+            id: generateId(), 
+            ...newExpense, 
+            amount: expenseAmount // 確保存入的是數字類型，不是文字
+        }]);
+
+        // 3. 重置表單並關閉視窗
+        setShowExpenseModal(false); 
+        setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
+        showToast('支出已記錄');
+    };
 
                 return (
                     <div className="p-4 md:p-8 h-full overflow-y-auto">
