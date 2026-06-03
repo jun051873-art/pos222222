@@ -735,27 +735,36 @@ const salaryReport = useMemo(() => {
                     });
                 }, [reportTx, safeStylists, safeSettings]);
 
-              const addExpense = () => {
-        // 1. 強制檢查金額是否存在且大於 0，防止寫入無效資料
-        const expenseAmount = Number(newExpense.amount);
-        if (!newExpense.amount || isNaN(expenseAmount) || expenseAmount <= 0) {
-            showToast('請輸入有效的金額', 'error');
-            return;
-        }
+       const addExpense = () => {
+    // 1. 金額檢查
+    const expenseAmount = Number(newExpense.amount);
+    if (!newExpense.amount || isNaN(expenseAmount) || expenseAmount <= 0) {
+        showToast('請輸入有效的金額', 'error');
+        return;
+    }
 
-        // 2. 將處理過的資料寫入
-        setExpenses([...safeExpenses, { 
-            id: generateId(), 
-            ...newExpense, 
-            amount: expenseAmount // 確保存入的是數字類型，不是文字
-        }]);
+    // 2. 💡 關鍵防呆：如果是員工借支，必須選擇人員
+    if (newExpense.type === '員工借支' && (!newExpense.staffId || newExpense.staffId === '')) {
+        showToast('員工借支必須指定員工', 'error');
+        return;
+    }
 
-        // 3. 重置表單並關閉視窗
-        setShowExpenseModal(false); 
-        setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
-        showToast('支出已記錄');
+    // 3. 準備寫入資料 (增加對 staffId 的處理)
+    const expenseData = { 
+        ...newExpense, 
+        id: generateId(), 
+        amount: expenseAmount,
+        // 如果不是借支，強制把 staffId 設為空，避免殘留 ID 影響薪資計算
+        staffId: newExpense.type === '員工借支' ? newExpense.staffId : ''
     };
 
+    setExpenses([...safeExpenses, expenseData]);
+    
+    // 4. 重置與收尾
+    setShowExpenseModal(false); 
+    setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
+    showToast('支出已記錄');
+};
                 return (
                     <div className="p-4 md:p-8 h-full overflow-y-auto">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -1579,12 +1588,45 @@ if (c.preferredStylistId) {
                             </div>
                         </div>
                         
-                        {/* 開單顧客顯示卡片 */}
-                        <div className="px-4 pt-3">
-                            <label className="text-xs font-bold text-slate-400 mb-1 block">當前開單顧客</label>
-                            
-                        {selectedCustomer && (selectedCustomer.name || selectedCustomer.Name) ? (
-    /* 💎 正式會員高質感藍紫色卡片 */
+                       {/* 🚀 開單顧客顯示卡片 (含轉為會員快捷按鈕) */}
+<div className="px-4 pt-3 space-y-2">
+    <div className="flex justify-between items-center">
+        <label className="text-xs font-bold text-slate-400">當前開單顧客</label>
+        {/* 只有在散客狀態下，才顯示轉為會員按鈕 */}
+        {!selectedCustomer && (
+            <button 
+                type="button"
+                onClick={() => {
+                    const name = prompt('請輸入新會員姓名：', adHocCustomerName);
+                    if (!name) return;
+                    const phone = prompt('請輸入電話號碼：');
+                    if (!phone) return;
+                    
+                    const newCust = { 
+                        id: generateId(), 
+                        name, 
+                        phone, 
+                        gender: adHocGender, 
+                        notes: '快速轉會員', 
+                        visits: 1, 
+                        totalSpend: cartTotal, 
+                        tags: [] 
+                    };
+                    setCustomers([...safeCustomers, newCust]);
+                    setSelectedCustomer(newCust);
+                    setAdHocCustomerName('');
+                    showToast(`已成功將 [${name}] 轉為會員`);
+                }}
+                className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700 font-bold flex items-center gap-1"
+            >
+                <UserPlus size={10}/> 轉為會員
+            </button>
+        )}
+    </div>
+    
+    {selectedCustomer && (selectedCustomer.name || selectedCustomer.Name) ? (
+    
+                            /* 💎 正式會員高質感藍紫色卡片 */
     <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 border border-indigo-400 p-4 rounded-xl flex justify-between items-center shadow-md text-white animate-fade-in w-full">
         <div className="flex-1 min-w-0">
            <div className="font-black flex items-center gap-1.5 text-base text-white">
