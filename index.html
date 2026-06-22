@@ -138,17 +138,25 @@
         ];
 
         // --- 4. Hook ---
-        function useStickyState(key, defaultValue) {
-            const [value, setValue] = useState(() => {
-                try {
-                    const stickyValue = window.localStorage.getItem(key);
-                    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
-                } catch (e) { return defaultValue; }
-            });
-            useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
-            return [value, setValue];
+function useStickyState(key, defaultValue) {
+    const [value, setValue] = useState(() => {
+        try {
+            const stickyValue = window.localStorage.getItem(key);
+            // 【關鍵修改】：加入 JSON 格式驗證
+            if (stickyValue !== null) {
+                return JSON.parse(stickyValue);
+            }
+            return defaultValue;
+        } catch (e) {
+            console.error("偵測到損壞的存檔，正在重置:", key);
+            // 這是關鍵：一旦解析錯誤，立即清除該筆髒資料，避免系統凍結
+            window.localStorage.removeItem(key); 
+            return defaultValue;
         }
-
+    });
+    useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
+    return [value, setValue];
+}
         // --- 5. Components ---
         const Modal = ({ title, onClose, children, size="max-w-md" }) => (
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
