@@ -390,14 +390,19 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                 const [editingOrder, setEditingOrder] = useState(null);
                 const [filterStylist, setFilterStylist] = useState('all');
 
-                const handleModeChange = (mode) => {
-                    setDateMode(mode);
-                    if (mode === 'month') {
-                        setQueryDate(getCurrentDateLocal().slice(0, 7));
-                    } else {
-                        setQueryDate(getCurrentDateLocal());
-                    }
-                };
+               const handleModeChange = (mode) => {
+    setDateMode(mode);
+    const now = new Date();
+    // 解決時區偏移問題的輔助函數
+    const getFormattedDate = (type) => {
+        const offset = now.getTimezoneOffset();
+        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+        if (type === 'month') return localDate.toISOString().slice(0, 7); // YYYY-MM
+        return localDate.toISOString().slice(0, 10); // YYYY-MM-DD
+    };
+
+    setQueryDate(getFormattedDate(mode));
+};
 
                 const filteredOrders = useMemo(() => {
                     return safeTransactions.filter(t => {
