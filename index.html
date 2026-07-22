@@ -1436,18 +1436,27 @@ const finalGender = selectedCustomer ? (selectedCustomer.Gender || selectedCusto
                                 </div>
                                 <div className="space-y-2 pt-2">
                                     <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {['現金', '信用卡', '街口支付', 'LINE Pay'].map(method => (
-                                            <button 
-                                                key={method} 
-                                                onClick={() => handleCheckout(method)}
-                                                className="py-3 rounded-xl border font-bold text-slate-700 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm flex items-center justify-center gap-1.5"
-                                            >
-                                                {method === '現金' ? <Banknote size={16} className="text-emerald-500"/> : <CreditCard size={16} className="text-indigo-500"/>}
-                                                {method}
-                                            </button>
-                                        ))}
-                                    </div>
+                                   <div className="grid grid-cols-2 gap-2">
+    {/* 定義支付方式與顏色對照 */}
+    {[
+        { name: '現金', color: 'bg-amber-100 text-amber-900 border-amber-200' },
+        { name: '信用卡', color: 'bg-violet-100 text-violet-900 border-violet-200' },
+        { name: '街口支付', color: 'bg-red-100 text-red-900 border-red-200' },
+        { name: 'LINE Pay', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+        { name: '轉帳', color: 'bg-blue-100 text-blue-900 border-blue-200' }
+    ].map((item) => (
+        <button 
+            key={item.name} 
+            onClick={() => handleCheckout(item.name)}
+            className={`py-3 rounded-xl border font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 ${item.color}`}
+        >
+            {item.name === '現金' && <Banknote size={16}/>}
+            {item.name === '轉帳' && <Smartphone size={16}/>}
+            {(item.name === '信用卡' || item.name === '街口支付' || item.name === 'LINE Pay') && <CreditCard size={16}/>}
+            {item.name}
+        </button>
+    ))}
+</div>
                                 </div>
                                 <button onClick={() => setShowCheckout(false)} className="btn btn-secondary w-full py-2.5 mt-2 text-sm">取消返回</button>
                             </div>
