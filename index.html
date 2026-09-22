@@ -2016,8 +2016,8 @@ const SettingsView = () => {
     }, [settings.shopID, settings.syncToken]);
 
     // 儲存連動設定
-    const saveCloudSettings = () => {
-        setSettings(prev => ({
+    const saveCloudSettings = async () => {
+        await setSettings(prev => ({
             ...prev,
             shopID: localShopID.trim(),
             cloudKey: DEFAULT_PROJECT_ID,
@@ -2191,7 +2191,7 @@ const SettingsView = () => {
                     </div>
                 </div>
                 <div className="flex gap-4">
-                    <button onClick={handleSettingsBackup} className="btn btn-primary flex-1 py-4 font-bold shadow-lg text-lg">
+                    <button onClick={async()=>{try{await saveCloudSettings();showToast("連線設定已儲存，尚未傳送資料", "success");}catch(e){showToast("設定未儲存，請重新核對", "error");}}} className="btn btn-secondary">儲存連線設定</button><button onClick={handleSettingsBackup} className="btn btn-primary flex-1 py-4 font-bold shadow-lg text-lg">
                         <Upload size={20}/> 建立空間並備份
                     </button>
                     <button onClick={handleSettingsRestore} className="btn btn-secondary flex-1 py-4 font-bold text-lg">
