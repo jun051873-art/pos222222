@@ -3,7 +3,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
    
-    <title>專屬空間沙龍 - 專業旗艦版 POS (v18.5 Ultimate)</title>
+    <title>專屬空間沙龍 - 專業旗艦版 POS (v18.6 預約對接)</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -41,6 +41,7 @@
 <body>
     <div id="root"></div>
 
+    <script src="self-pos-core.js?v=20260922a"></script>
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback } = React;
 
@@ -154,8 +155,14 @@ function useStickyState(key, defaultValue) {
             return defaultValue;
         }
     });
-    useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
-    return [value, setValue];
+    useEffect(() => {
+        if(localStorage.getItem(key)===null)localStorage.setItem(key,JSON.stringify(defaultValue));
+        const refresh=e=>{if(e.key===key||e.key===null){try{setValue(JSON.parse(localStorage.getItem(key))??defaultValue);}catch{}}};
+        window.addEventListener('storage',refresh);window.addEventListener('salon-local-update',refresh);
+        return()=>{window.removeEventListener('storage',refresh);window.removeEventListener('salon-local-update',refresh);};
+    },[key]);
+    const persist=next=>{const write=()=>{const raw=localStorage.getItem(key);const prev=raw===null?value:JSON.parse(raw);if(key==='salon_transactions'&&typeof next!=='function'&&JSON.stringify(prev)!==JSON.stringify(value))throw Error('單據已在另一個分頁更新，請重新核對');const result=typeof next==='function'?next(prev):next;localStorage.setItem(key,JSON.stringify(result));setValue(result);};if(key==='salon_transactions'&&navigator.locks)return navigator.locks.request('salon_transactions-write',write).catch(e=>{alert(e.message+'；本次單據未儲存，請保留畫面並重試');throw e;});else return write();};
+    return [value,persist];
 }
         // --- 5. Components ---
         const Modal = ({ title, onClose, children, size="max-w-md" }) => (
@@ -235,8 +242,36 @@ function useStickyState(key, defaultValue) {
         );
 
        // --- 6. App ---    
+const BookingImportView=()=>{
+ const B=window.AetherPosBridge;
+ const [tick,setTick]=useState(0),[selected,setSelected]=useState(null),[rows,setRows]=useState([]),[sty,setSty]=useState(''),[method,setMethod]=useState(''),[ack,setAck]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[linked,setLinked]=useState('');
+ const settings=B.read('salon_settings',{}),services=B.read('salon_services',[]),staff=B.read('salon_stylists',[]),tx=B.read('salon_transactions',[]),packets=B.packets();
+ useEffect(()=>{const on=()=>setTick(x=>x+1);window.addEventListener('storage',on);return()=>window.removeEventListener('storage',on);},[]);
+ const mappingKey=B.PREFIX+'maps:'+B.storeKey(settings);
+ const methods=['現金','信用卡','街口支付','LINE Pay','轉帳'];
+ const pick=p=>{const maps=B.read(mappingKey,{}),key=p.source+'|';const next=p.services.flatMap(s=>{const ids=maps[key+'service:'+s.id]||[B.sameName(services.filter(x=>!x.isProduct),s.name)];return ids.map(serviceId=>({sourceId:s.id,sourceName:s.name,serviceId,amount:''}));});if(next.length===1)next[0].amount=String(p.amount);setRows(next);setSty(maps[key+'sty:'+p.stylist.id]||B.sameName(staff,p.stylist.name));setMethod(p.methods.length===1?(maps[key+'method:'+p.methods[0].id]||methods.find(x=>B.norm(x)===B.norm(p.methods[0].name))||''):'');setSelected(p);setAck(false);setError('');setLinked('');};
+ const existing=selected?tx.find(t=>t.id===selected.id||t.sourceAppointment?.id===selected.id):null;
+ const possible=selected?tx.filter(t=>!t.sourceAppointment&&String(t.date||'').slice(0,10)===selected.date&&B.norm(t.customerName)===B.norm(selected.name)&&Number(t.total)===Number(selected.amount)):[];
+ const confirmPost=async()=>{setBusy(true);setError('');try{const result=await B.post(selected,rows.map(r=>({...r,stylistId:sty})),method,ack,linked);const maps=B.read(mappingKey,{}),key=selected.source+'|';for(const s of selected.services)maps[key+'service:'+s.id]=rows.filter(r=>r.sourceId===s.id).map(r=>r.serviceId);maps[key+'sty:'+selected.stylist.id]=sty;if(selected.methods.length===1)maps[key+'method:'+selected.methods[0].id]=method;localStorage.setItem(mappingKey,JSON.stringify(maps));setError(result.status==='created'?'已入帳，新增金額 $'+result.added:'已對應原單，沒有新增營收');setTick(x=>x+1);setSelected(null);}catch(e){setError(e.message);}finally{setBusy(false);}};
+ return <div className="p-5 md:p-8 max-w-5xl mx-auto space-y-5"><h1 className="text-2xl font-black">待核對預約</h1><div className="p-4 bg-amber-50 rounded-xl border border-amber-200"><b>目的店號：{settings.shopID||'尚未設定，請先到系統設定核對'}</b><p>資料只進入目前瀏覽器的自用POS。請先還原最新POS備份並核對店號，再入帳；完成後到系統設定備份至雲端。</p><p>按完成不會自動開單；只有這裡確認後才計入報表。同一預約使用固定單號，重複傳送不會增加金額。</p></div><p>目前收到 {packets.length} 筆 · 請先核對原本手動開過的單，避免同一筆消費重算。</p>{error&&<p role="status" className="p-4 bg-indigo-50 border rounded-xl">{error}</p>}
+ {!packets.length&&<p className="p-6 bg-white rounded-xl">尚未收到預約。請用同一個瀏覽器開啟預約表，按卡片的「傳送到美髮開單」，或在預約表設定按月份傳送。</p>}
+ {packets.map(p=>{const order=tx.find(t=>t.id===p.id||t.sourceAppointment?.id===p.id),r=B.receipt(p.id);return <button key={p.id} onClick={()=>pick(p)} className="block w-full text-left bg-white rounded-2xl p-5 border shadow-sm"><b>{p.date} {p.time} · {p.name} · ${p.amount}</b><p>{p.services.map(s=>s.name).join('＋')} · {p.stylist.name}</p><small>{order?'已入帳／已對應原單':r?.status==='posted'?'曾入帳，請核對最新POS備份':'待核對，不計入營收'}</small></button>;})}
+ {selected&&<Modal title="核對預約與入帳" onClose={()=>{if(!busy)setSelected(null);}}><div className="space-y-4"><p><b>{selected.date} {selected.time} · {selected.name} · ${selected.amount}</b></p><p>來源：{selected.sourceName} · 已收 ${selected.paid} · {selected.people} 人</p>{existing?<div><b>此筆已有單號 {existing.id}，不會重複入帳。</b><p>原單金額 ${existing.total}。若预約內容有修改，請到「查單管理」核對這張單。</p></div>:<>
+ <label className="block">對應人員<select aria-label="對應人員" className="input-field" value={sty} onChange={e=>setSty(e.target.value)}><option value="">請選擇</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+ <p>請將各項服務拆分為折扣後金額，合計須等於 ${selected.amount}。名稱不同可手動對應，設定會記住。</p>
+ {rows.map((r,i)=><div key={i} className="border p-3 rounded-xl space-y-2"><b>預約項目：{r.sourceName}</b><select aria-label={'對應服務'+(i+1)} className="input-field" value={r.serviceId} onChange={e=>setRows(rows.map((x,j)=>j===i?{...x,serviceId:e.target.value}:x))}><option value="">請選擇POS服務</option>{services.filter(s=>!s.isProduct).map(s=><option key={s.id} value={s.id}>{s.category} · {s.name} · 材料 {s.cost||0}%</option>)}</select><label>這項金額<input aria-label={'拆分金額'+(i+1)} type="number" min="0" step="0.01" className="input-field" value={r.amount} onChange={e=>setRows(rows.map((x,j)=>j===i?{...x,amount:e.target.value}:x))}/></label><button className="btn btn-secondary" onClick={()=>setRows([...rows,{...r,serviceId:'',amount:''}])}>把這項拆成另一個POS服務</button>{rows.filter(x=>x.sourceId===r.sourceId).length>1&&<button className="btn btn-secondary" onClick={()=>setRows(rows.filter((_,j)=>i!==j))}>移除此拆分列</button>}</div>)}
+ <p>目前拆分合計：${rows.reduce((n,r)=>n+(Number(r.amount)||0),0)}</p>
+ <label className="block">付款方式（預約：{selected.methods.map(x=>x.name).join('＋')||'未填'}）<select aria-label="對應付款方式" className="input-field" value={method} onChange={e=>setMethod(e.target.value)}><option value="">請選擇</option>{methods.map(m=><option key={m}>{m}</option>)}</select></label>
+ {selected.methods.length>1&&<p className="text-red-700">原單有多種付款方式，此版POS只支援單一付款方式，請先在原單核對；不會自動拆分收款。</p>}
+ {!!possible.length&&<label className="block bg-amber-50 p-3">可能已手動開過：請核對並對應原单，不新增金額<select aria-label="對應既有單據" className="input-field" value={linked} onChange={e=>setLinked(e.target.value)}><option value="">選擇已存在的同一筆單據</option>{possible.map(t=><option key={t.id} value={t.id}>{t.date} · {t.customerName} · ${t.total} · {t.id}</option>)}</select></label>}
+ <p className="text-sm text-slate-600">沿用POS現有材料比例與抽成計算。此入口只處理單人服務；多人預約、商品庫存、儲值或協助費需另行核對；保留顧客姓名，但不自動建立會員或變更會員累計。確認無需這些項目再入帳。</p>
+ <label className="flex gap-2"><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>我已核對目的店號、原有單據、服務、人員、金額與材料比例，確認可入帳。</label>
+ <button className="btn btn-primary" disabled={busy||!ack||(selected.methods.length>1&&!linked)} onClick={confirmPost}>{busy?'儲存中…':linked?'確認對應原單（不新增營收）':'確認新增一張單'}</button></>}{error&&<p role="alert" className="text-red-700">{error}</p>}</div></Modal>}
+ </div>;
+};
+
     function HairSalonApp() {
-    const [activeTab, setActiveTab] = useState('pos');
+    const [activeTab, setActiveTab] = useState(location.hash==='#booking-import'?'booking-import':'pos');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [notification, setNotification] = useState(null);
 const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
@@ -424,6 +459,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             // 1. 先從本地陣列中移除
             const updatedTransactions = transactions.filter(t => t.id !== orderId);
             
+            try{await setTransactions(updatedTransactions);}catch{return;}
             // 2. 更新顧客累計資料 (這部分維持你原本的邏輯)
             const order = transactions.find(t => t.id === orderId);
             if (order && order.customerId) {
@@ -440,16 +476,17 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                 setCustomers(updatedCustomers);
             }
          
-            setTransactions(updatedTransactions); 
+
             showToast('訂單已刪除');
       
         });
     };
 
-const handleUpdateOrder = (updatedOrder) => {
+const handleUpdateOrder = async (updatedOrder) => {
     // 定義為 newTransactions
     const newTransactions = safeTransactions.map(t => t.id === updatedOrder.id ? updatedOrder : t);
 
+    try{await setTransactions(newTransactions);}catch{return;}
     const oldOrder = safeTransactions.find(t => t.id === updatedOrder.id);
     if (oldOrder && oldOrder.customerId && oldOrder.total !== updatedOrder.total) {
         const diff = updatedOrder.total - oldOrder.total;
@@ -463,7 +500,7 @@ const handleUpdateOrder = (updatedOrder) => {
     }
     
     // --- 修正：使用正確的變數名稱並移除重複行 ---
-    setTransactions(newTransactions); 
+
 
     setEditingOrder(null);
     showToast('訂單已修正');
@@ -1339,7 +1376,7 @@ const salaryReport = useMemo(() => {
                 showToast('單據已取出');
             };
 
-            const handleCheckout = (paymentMethod) => {
+            const handleCheckout = async (paymentMethod) => {
                 if (cart.length === 0) return;
                 
                const finalCustName = selectedCustomer ? (selectedCustomer.Name || selectedCustomer.name) : (adHocCustomerName || '散客');
@@ -1359,6 +1396,7 @@ const finalGender = selectedCustomer ? (selectedCustomer.Gender || selectedCusto
                     createdAt: new Date().toISOString() 
                 };
 
+                try{await setTransactions([newOrder, ...safeTransactions]);}catch{return;}
                 const updatedServices = safeServices.map(s => {
                     const cartItems = cart.filter(i => i.id === s.id);
                     if (s.isProduct && s.stock !== null && cartItems.length > 0) { 
@@ -1377,7 +1415,7 @@ const finalGender = selectedCustomer ? (selectedCustomer.Gender || selectedCusto
                     ));
                 }
 
-                setTransactions([newOrder, ...safeTransactions]);
+
                 setCart([]); 
                 setSelectedCustomer(null); 
                 setAdHocCustomerName(''); 
@@ -2303,9 +2341,9 @@ const SettingsView = () => {
                     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
                         <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
-                            {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
+                            {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'booking-import', icon:ClipboardList, label:'待核對預約'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.0 Ultimate</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.6 預約對接</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
@@ -2317,7 +2355,7 @@ const SettingsView = () => {
                             </div>
                             <div className="flex-1 overflow-y-auto pt-4 pb-10">
                                 {[ 
-                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
+                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'booking-import', label:'待核對預約'}, {id:'report', label:'報表'}, 
                                     {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'} 
                                 ].map(item => (
                                     <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
@@ -2339,6 +2377,7 @@ const SettingsView = () => {
                         <div className="flex-1 overflow-auto bg-slate-50">
                             {activeTab === 'pos' && <POSView />}
                             {activeTab === 'orders' && <OrderView />}
+                            {activeTab === 'booking-import' && <BookingImportView />}
                             {activeTab === 'report' && <ReportView />}
                             {activeTab === 'customers' && <CustomerView />}
                             {activeTab === 'staff' && <StaffView />}
