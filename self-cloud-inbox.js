@@ -21,16 +21,8 @@ let result;try{result=await localPost(p,rows,method,ack,linked,choice);}catch(e)
 try{await db.runTransaction(async t=>{const s=await t.get(r);if(!s.exists||s.data().claim!==claim)throw Error('核對狀態改變');t.update(r,{state:'posted',orderId:result.orderId,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});});}catch(e){throw Error('本機已入帳，雲端回執尚未完成。請在這台裝置重新開啟此單完成回執，不要在其他裝置重開。');}complete(p.id);return result;}
 async function finish(p){await verified();if(B.read('salon_settings',{}).shopID!==TARGET)throw Error('請先核對目的店號');const order=B.read('salon_transactions',[]).find(t=>t.id===p.id||t.sourceAppointment?.id===p.id);if(!order||order.sourceAppointment?.fingerprint!==B.comparable(p))throw Error('本機原單與來源不同，請核對');const claim=device();await db.runTransaction(async t=>{const r=ref(p.id),s=await t.get(r);if(!s.exists)throw Error('雲端找不到這筆預約');const d=s.data();if(B.comparable(JSON.parse(d.packet))!==B.comparable(p))throw Error('來源資料已改變，請重新核對');if(d.state==='posted'&&d.orderId===order.id)return;if(d.state!=='processing'||d.claim!==claim)throw Error('請回原處理裝置完成');t.update(r,{state:'posted',orderId:order.id,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});});complete(p.id);}
 
-const removedKey=B.PREFIX+'removed-inbox';
-const removed=()=>B.read(removedKey,[]);
-async function discard(p){await verified();if(B.read('salon_settings',{}).shopID!==TARGET)throw Error('請先核對目的店號');if(B.read('salon_transactions',[]).some(t=>t.id===p.id||t.sourceAppointment?.id===p.id)||B.receipt(p.id)?.status==='posted')throw Error('這筆已有入帳紀錄，請先完成回執，不能移除');
-// Save a recoverable copy before removing only the pending inbox document.
-const previous=removed();localStorage.setItem(removedKey,JSON.stringify([...previous.filter(x=>x.id!==p.id),p]));
-try{await db.runTransaction(async t=>{const r=ref(p.id),s=await t.get(r);if(!s.exists)return;const d=s.data();if(d.state!=='pending'||B.comparable(JSON.parse(d.packet))!==B.comparable(p))throw Error('這筆狀態已改變或正在入帳，請重新核對');t.delete(r);});}catch(e){localStorage.setItem(removedKey,JSON.stringify(previous));throw e;}complete(p.id);}
-async function restore(p){const status=await send(p);if(status==='posted')throw Error('此筆已入帳，不需復原');completed.delete(p.id);localStorage.setItem(removedKey,JSON.stringify(removed().filter(x=>x.id!==p.id)));if(!api.packets.some(x=>x.id===p.id))api.packets.push(p);notify();}
-
 const originalPackets=B.packets;B.packets=()=>api.state==='ready'?api.packets:[];B.post=post;
-Object.assign(api,{start,login,send,post,finish,discard,restore,removed,localPackets:originalPackets});root.AetherCloudInbox=api;
+Object.assign(api,{start,login,send,post,finish,localPackets:originalPackets});root.AetherCloudInbox=api;
 if(root.location?.pathname.startsWith('/pos222222/'))start().catch(fail);
 })(window);
 
