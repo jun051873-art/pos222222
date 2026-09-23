@@ -41,7 +41,7 @@
 <body>
     <div id="root"></div>
 
-    <script src="self-pos-core.js?v=20260923-match2"></script><script src="self-cloud-inbox.js?v=20260923-match2"></script>
+    <script src="self-pos-core.js?v=20260923-match2"></script>
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback } = React;
 
@@ -242,70 +242,8 @@ function useStickyState(key, defaultValue) {
         );
 
        // --- 6. App ---    
-const CloudInboxStatus=()=>{const C=window.AetherCloudInbox;const [n,N]=useState(0),[err,E]=useState(''),[busy,S]=useState(false);useEffect(()=>{const f=()=>N(x=>x+1);window.addEventListener('aether-inbox',f);return()=>window.removeEventListener('aether-inbox',f);},[]);return <div className="border rounded-xl p-4 bg-white"><b>{C?.message||'正在連線'}</b>{C?.state==='signed-out'&&<form className="space-y-2 mt-3" onSubmit={async e=>{e.preventDefault();const f=e.currentTarget;S(true);E('');try{await C.login('051873預約表',f.elements.cloudKey.value);f.reset();}catch(x){E(x.message);}finally{S(false);}}}><p>使用預約表的雲端鑰匙連接一次；之後從原網址開啟就能接收。此處不是Google管理帳號。</p><label>預約表雲端鑰匙<input className="input-field" name="cloudKey" type="password" required autoComplete="current-password"/></label><button className="btn btn-primary" disabled={busy}>{busy?'連線中…':'連接本店預約'}</button></form>}{err&&<p role="alert">{err}</p>}</div>};
-
-const BookingImportView=()=>{
- const B=window.AetherPosBridge,C=window.AetherCloudInbox;
- const [tick,setTick]=useState(0),[p,setP]=useState(null),[rows,setRows]=useState([]),[choice,setChoice]=useState({}),[method,setMethod]=useState(''),[linked,setLinked]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
- const saving=React.useRef(false);
- const [filterDate,setFilterDate]=useState(()=>{const d=new URLSearchParams(location.search).get('bookingDate')||sessionStorage.getItem('salon-inbox-date')||'';return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:'';});
- const settings=B.read('salon_settings',{}),defs=B.read('salon_services',[]),staff=B.read('salon_stylists',[]),customers=B.read('salon_customers',[]),tx=B.read('salon_transactions',[]),packets=B.packets(),methods=['現金','信用卡','街口支付','LINE Pay','轉帳'];
- const visiblePackets=packets.filter(x=>!filterDate||x.date===filterDate).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
- const receiptPackets=C.receipts().filter(x=>!filterDate||x.date===filterDate);
- useEffect(()=>{sessionStorage.setItem('salon-inbox-date',filterDate);},[filterDate]);
- useEffect(()=>{const refresh=()=>setTick(n=>n+1);for(const name of ['storage','salon-local-update','aether-inbox'])window.addEventListener(name,refresh);return()=>{for(const name of ['storage','salon-local-update','aether-inbox'])window.removeEventListener(name,refresh);};},[]);
- const pick=x=>{
-  const matches=B.candidates(x,customers),known=matches.filter(m=>m.score===100),maps=B.read('salon_settings',{}).bookingItemMaps||{};
-  const makeRow=(s,kind)=>{const options=defs.filter(d=>!!d.isProduct===(kind==='product')),remembered=maps[x.source+'|'+kind+':'+(kind==='product'?s.productId:s.id)],saved=B.byId(options,remembered),same=B.sameName(options,s.name);return {sourceId:s.id,sourceName:s.name,kind,qty:kind==='product'?s.qty:1,amount:kind==='product'?String(s.amount):'',mode:'existing',serviceId:String(saved?.id??same??''),cost:'',category:kind==='product'?'販賣':'',stock:'',newName:s.name};};
-  const rs=[...x.services.map(s=>makeRow(s,'service')),...(x.products||[]).map(s=>makeRow(s,'product'))];if(x.services.length===1)rs[0].amount=String(x.serviceAmount??x.amount);
-  setRows(rs);setChoice({snapshot:B.snapshot(),customerMode:known.length===1?'existing':matches.length?'':'new',customerId:known.length===1?String(known[0].customer.id):'',fields:{name:'keep',phone:'keep',birthday:'keep'},stylistId:String(B.sameName(staff,x.stylist.name)||'')});
-  setMethod(x.methods.length===1?methods.find(m=>B.norm(m)===B.norm(x.methods[0].name))||'':'');setLinked('');setP(x);setError('');
- };
- const update=(i,values)=>setRows(prev=>prev.map((r,j)=>i===j?{...r,...values}:r));
- const chosen=B.byId(customers,choice.customerId),matches=p?B.candidates(p,customers):[],existing=p&&tx.find(t=>t.id===p.id||t.sourceAppointment?.id===p.id);
- const possible=p?tx.filter(t=>!t.sourceAppointment&&String(t.date||'').slice(0,10)===p.date&&(B.norm(t.customerName)===B.norm(p.name)||(chosen&&B.sameId(t.customerId,chosen.id)))):[];
- const finish=async x=>{if(saving.current)return;saving.current=true;setBusy(true);setError('');try{await C.finish(x);setP(null);setMessage('已更新雲端完成狀態，不會重複入帳。');setTick(n=>n+1);}catch(e){setError(e.message);}finally{saving.current=false;setBusy(false);}};
- const submit=async next=>{
-  if(saving.current)return;
-  if(!linked){const missing=rows.find(r=>r.mode!=='new'&&!B.byId(defs.filter(d=>!!d.isProduct===(r.kind==='product')),r.serviceId));if(missing){setError('請先選擇「'+missing.sourceName+'」對應的'+(missing.kind==='product'?'販賣商品':'服務項目')+'，沒有再選建立新項目。');return;}}
-  saving.current=true;setBusy(true);setError('');const current=p;
-  try{const result=await B.post(current,rows,method,true,linked,choice);setP(null);setTick(n=>n+1);setMessage(current.name+' · '+current.date+' · $'+current.amount+' 已'+(result.status==='created'?'入帳':'連結原單')+'，已移出待核對。'+(result.receiptPending?'雲端完成狀態待同步，可在下方重試。':''));if(next){const remaining=B.packets().filter(x=>(!filterDate||x.date===filterDate)&&x.id!==current.id).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));if(remaining.length){setP(null);setNextId(remaining[0].id);}}}
-  catch(e){setError(e.message);}finally{saving.current=false;setBusy(false);}
- };
- // Read freshly persisted mappings and customer data on the next render.
- const [nextId,setNextId]=useState('');useEffect(()=>{if(nextId&&!busy){const x=B.packets().find(x=>x.id===nextId);setNextId('');if(x)pick(x);}},[nextId,busy]);
- return <div className="p-5 md:p-8 max-w-5xl mx-auto space-y-4">
-  <h1 className="text-2xl font-black">待核對預約</h1><CloudInboxStatus/>
-  <div className="bg-indigo-50 rounded-xl p-4"><b>專屬空間 · 核對後入帳</b><p>選擇開單系統的對應項目，確認後即移出待核對。帳目依原預約日期保存。</p><p className="text-sm">本機帳目請保持最新；完成後請備份。</p></div>
-  {message&&<p role="status" className="p-3 rounded-xl bg-emerald-50 text-emerald-800 font-bold">{message}</p>}{!p&&error&&<p role="alert" className="text-red-700">{error}</p>}
-  <div className="card p-4 space-y-3"><label className="font-bold">核對日期<input aria-label="核對日期" type="date" className="input-field mt-2" value={filterDate} onChange={e=>setFilterDate(e.target.value)}/></label><button className="btn btn-secondary" onClick={()=>setFilterDate('')}>查看全部日期</button><p className="text-xl font-black">{filterDate||'全部日期'}：待核對 {visiblePackets.length} 筆 · ${visiblePackets.reduce((n,x)=>n+Number(x.amount),0).toLocaleString('zh-TW')}</p><p>全部待核對共 {packets.length} 筆</p>{visiblePackets.length>0&&<button className="btn btn-primary" disabled={busy||C.state!=='ready'} onClick={()=>pick(visiblePackets[0])}>開始逐筆核對</button>}</div>
-  {visiblePackets.map(x=><button className="block w-full text-left bg-white border rounded-xl p-4" key={x.id} disabled={busy||C.state!=='ready'} onClick={()=>pick(x)}><b>{x.date} {x.time} · {x.name} · ${x.amount}</b><p>{x.services.map(s=>s.name).join('＋')}{(x.products||[]).length?' ＋ 商品 '+x.products.map(s=>s.name+' ×'+s.qty).join('、'):''}</p><span className="text-sm text-indigo-600">選擇對應項目並入帳 ›</span></button>)}
-  {C.state==='ready'&&!visiblePackets.length&&<p>這個範圍已沒有待核對預約。已完成的帳目請到「查單管理」查看。</p>}
-  {receiptPackets.length>0&&<section className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-2"><h2 className="font-bold">已入帳，待同步完成狀態 · {receiptPackets.length} 筆</h2><p>這些單據已保存在本機，不需再核對，也不會再次增加營收。</p>{receiptPackets.map(x=><div className="flex flex-wrap gap-2 items-center justify-between" key={x.id}><span>{x.date} · {x.name} · ${x.amount}</span><button className="btn btn-secondary" disabled={busy||C.state!=='ready'} onClick={()=>finish(x)}>同步完成狀態</button></div>)}</section>}
-  {p&&<Modal title="核對並入帳" size="max-w-3xl" onClose={()=>{if(!busy){setP(null);setError('');}}}><div className="space-y-4">
-   <div className="bg-indigo-50 rounded-xl p-3"><b className="text-lg">{p.name} · ${p.amount}</b><p>入帳日期：{p.date} {p.time}（原預約日期）</p></div>
-   {busy?<p role="status">正在儲存，請稍候…</p>:existing?<div><p>本機已有這張單據，不會再新增。</p><button className="btn btn-primary" onClick={()=>finish(p)}>同步完成狀態</button></div>:<>
-    <section className="space-y-2"><label className="font-bold">對應顧客<select aria-label="對應顧客" className="input-field" value={choice.customerMode==='existing'?choice.customerId:choice.customerMode?'__'+choice.customerMode:''} onChange={e=>{const v=e.target.value;setChoice({...choice,customerMode:v==='__new'?'new':v==='__guest'?'guest':v?'existing':'',customerId:v.startsWith('__')?'':v});}}><option value="">請選擇顧客</option>{customers.map(c=><option key={c.id} value={String(c.id)}>{B.cname(c)}{c.phone||c.Phone?' · '+(c.phone||c.Phone):''}{matches.some(m=>B.sameId(m.customer.id,c.id))?'（可能對應）':''}</option>)}<option value="__new">＋ 建立新顧客：{p.name}</option><option value="__guest">以散客入帳</option></select></label>{choice.customerMode==='new'&&matches.length>0&&<label className="flex gap-2"><input type="checkbox" checked={!!choice.distinctCustomer} onChange={e=>setChoice({...choice,distinctCustomer:e.target.checked})}/>已看過相似顧客，確認是不同的人</label>}<p className="text-sm text-slate-500">選擇既有顧客就沿用開單系統資料；確認一次後記住對應。</p></section>
-    {possible.length>0&&<section className="border border-amber-200 rounded-xl p-3 space-y-2"><b>當天已有這位顧客的單據</b><select aria-label="對應既有單據" className="input-field" value={linked} onChange={e=>setLinked(e.target.value)}><option value="">這是另一筆，建立新單</option>{possible.map(t=><option key={t.id} value={String(t.id)}>{t.date} · {t.customerName} · ${t.total} · {(t.items||[]).map(i=>i.name).join('＋')}</option>)}</select>{!linked&&<label className="flex gap-2"><input type="checkbox" checked={!!choice.distinctOrder} onChange={e=>setChoice({...choice,distinctOrder:e.target.checked})}/>已查過原單，確定不是重複消費</label>}{linked&&<p>只連結原單，不增加營收與庫存異動。</p>}</section>}
-    {!linked&&<>
-     <label className="block font-bold">對應人員<select aria-label="對應人員" className="input-field" value={choice.stylistId} onChange={e=>setChoice({...choice,stylistId:e.target.value})}><option value="">請選擇人員</option>{staff.map(s=><option key={s.id} value={String(s.id)}>{s.name}</option>)}<option value="__new">＋ 建立新人員：{p.stylist.name}</option></select></label>
-     {rows.map((r,i)=><section key={i} className="bg-slate-50 border rounded-xl p-3 space-y-2"><b>{r.kind==='product'?'販賣商品':'服務'}：{r.sourceName}{r.kind==='product'?' × '+r.qty:''}</b><label className="block">對應開單系統的{r.kind==='product'?'商品':'服務'}<select aria-label={'對應項目'+(i+1)} className="input-field" value={r.mode==='new'?'__new':r.serviceId} onChange={e=>update(i,e.target.value==='__new'?{mode:'new',serviceId:''}:{mode:'existing',serviceId:e.target.value})}><option value="">請選擇對應{r.kind==='product'?'商品':'服務'}</option>{defs.filter(d=>!!d.isProduct===(r.kind==='product')).map(d=><option key={d.id} value={String(d.id)}>{d.name}{d.category?' · '+d.category:''}</option>)}<option value="__new">＋ 沒有對應，建立新{r.kind==='product'?'商品':'服務'}</option></select></label>
-      {r.mode==='new'&&<div className="space-y-2 border-t pt-2"><label className="block">新項目名稱<input aria-label={'新項目名稱'+(i+1)} className="input-field" value={r.newName} onChange={e=>update(i,{newName:e.target.value})}/></label><label className="block">分類<input aria-label={'分類'+(i+1)} className="input-field" list={'booking-categories-'+i} value={r.category} onChange={e=>update(i,{category:e.target.value})}/><datalist id={'booking-categories-'+i}>{(settings.categories||[]).map(c=><option key={c} value={c}/>)}</datalist></label><label className="block">{r.kind==='product'?'每件進貨成本（元）':'材料比例（%）'}<input aria-label={'成本'+(i+1)} className="input-field" type="number" min="0" step="0.01" value={r.cost} onChange={e=>update(i,{cost:e.target.value})}/></label>{r.kind==='product'&&<label className="block">這次販賣前的庫存<input aria-label={'庫存'+(i+1)} className="input-field" type="number" min="0" step="1" value={r.stock} onChange={e=>update(i,{stock:e.target.value})}/></label>}</div>}
-      <label className="block">{rows.filter(x=>x.kind==='service').length>1&&r.kind==='service'?'分配給這項服務的金額':'實收金額'}<input aria-label={'拆分金額'+(i+1)} className="input-field" type="number" min="0" step="0.01" value={r.amount} readOnly={r.kind==='product'} onChange={e=>update(i,{amount:e.target.value})}/></label>
-     </section>)}
-     <label className="block font-bold">付款方式<select aria-label="對應付款方式" className="input-field" value={method} onChange={e=>setMethod(e.target.value)}><option value="">請選擇付款方式</option>{methods.map(m=><option key={m}>{m}</option>)}</select></label>
-    </>}
-    <div className="border-t pt-3 space-y-2"><p className="font-bold">{p.date} · 合計 ${p.amount} · 已收 ${p.paid}</p><p className="text-sm">{linked?'確認後連結原單並移出待核對。':'按下確認即儲存，名稱沿用你選擇的開單項目。'}</p><div className="flex flex-wrap gap-2"><button className="btn btn-primary flex-1" onClick={()=>submit(true)}>確認入帳，核對下一筆</button><button className="btn btn-secondary" onClick={()=>submit(false)}>確認入帳並關閉</button></div></div>
-   </>}{error&&<p role="alert" className="text-red-700 font-bold">{error}</p>}
-  </div></Modal>}
- </div>;
-};
-
-const BookingInboxNotice=({onOpen})=>{const [n,setN]=useState(0);useEffect(()=>{const update=()=>{const B=window.AetherPosBridge;setN(B.packets().length);};update();window.addEventListener('storage',update);window.addEventListener('salon-local-update',update);window.addEventListener('aether-inbox',update);return()=>{window.removeEventListener('storage',update);window.removeEventListener('salon-local-update',update);window.removeEventListener('aether-inbox',update);};},[]);return n?<button className="p-3 bg-amber-100 text-amber-900 font-bold" onClick={onOpen}>收到 {n} 筆預約，點此核對顧客與項目</button>:null;};
-
-
     function HairSalonApp() {
-    const [activeTab, setActiveTab] = useState(location.hash==='#booking-import'?'booking-import':'pos');
+    const [activeTab, setActiveTab] = useState('pos');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [notification, setNotification] = useState(null);
 const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
@@ -2377,9 +2315,9 @@ const SettingsView = () => {
                     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
                         <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
-                            {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'booking-import', icon:ClipboardList, label:'待核對預約'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
+                            {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.8 快速核對版 0923.2</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.8 獨立開單版 0923.3</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
@@ -2391,7 +2329,7 @@ const SettingsView = () => {
                             </div>
                             <div className="flex-1 overflow-y-auto pt-4 pb-10">
                                 {[ 
-                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'booking-import', label:'待核對預約'}, {id:'report', label:'報表'}, 
+                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
                                     {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'} 
                                 ].map(item => (
                                     <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
@@ -2402,7 +2340,7 @@ const SettingsView = () => {
 
                     {/* 主內容區 */}
                     <main className="flex-1 w-full h-screen overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top)]">
-                        {activeTab !== 'booking-import' && <BookingInboxNotice onOpen={()=>setActiveTab('booking-import')}/>} {/* 手機版頂欄 */}
+                        {/* 手機版頂欄 */}
                         <div className="lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
                             <div className="font-bold flex items-center gap-2 text-slate-800">
                                 <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
@@ -2413,7 +2351,7 @@ const SettingsView = () => {
                         <div className="flex-1 overflow-auto bg-slate-50">
                             {activeTab === 'pos' && <POSView />}
                             {activeTab === 'orders' && <OrderView />}
-                            {activeTab === 'booking-import' && <BookingImportView />}
+                            
                             {activeTab === 'report' && <ReportView />}
                             {activeTab === 'customers' && <CustomerView />}
                             {activeTab === 'staff' && <StaffView />}
