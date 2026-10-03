@@ -75,19 +75,46 @@ const cloudSubscribe=f=>subscribe(PREFIX+'cloud',f);
 function status(state,message,extra={}){cloudState={state,message,...extra};emit(PREFIX+'cloud');}
 function cloudURL(settings){if(!settings.shopID?.trim()||!settings.syncToken?.trim())throw Error('請先設定店號與同步金鑰');return 'https://firestore.googleapis.com/v1/projects/salonpos-system/databases/(default)/documents/SalonPOS/'+encodeURIComponent(settings.shopID.trim())+'/Tokens/'+encodeURIComponent(settings.syncToken.trim());}
 async function responseJSON(r){let data;try{data=await r.json();}catch{throw Error('雲端回應格式異常');}if(!r.ok)throw Error(r.status===403?'雲端權限拒絕存取，請檢查 Firebase 規則':data.error?.message||'雲端連線失敗 ('+r.status+')');return data;}
+const CLOUD_LIMIT=900000,MAX_BACKUP_BYTES=32*1024*1024;
+async function digest(bytes){if(!root.crypto?.subtle)throw Error('此瀏覽器無法驗證壓縮備份，請使用更新的瀏覽器；本機資料未變更');return Array.from(new Uint8Array(await root.crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');}
+function toBase64(bytes){let text='';for(let i=0;i<bytes.length;i+=8192)text+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(text);}
+async function unpackCloud(content){
+ const envelope=JSON.parse(content);if(envelope?.format!=='salon-pos-gzip-v1')return validateBackup(envelope);
+ if(!Number.isSafeInteger(envelope.rawBytes)||envelope.rawBytes<1||envelope.rawBytes>MAX_BACKUP_BYTES||typeof envelope.data!=='string'||!/^[a-f0-9]{64}$/.test(envelope.sha256||''))throw Error('壓縮備份格式異常，未還原任何資料');
+ if(!root.fflate)throw Error('備份解壓縮元件未載入，請重新整理');
+ let bytes;try{const zipped=Uint8Array.from(atob(envelope.data),c=>c.charCodeAt(0));await new Promise(r=>setTimeout(r,0));bytes=root.fflate.gunzipSync(zipped,{out:new Uint8Array(envelope.rawBytes)});}catch{throw Error('雲端備份解壓縮失敗，未還原任何資料');}
+ if(bytes.length!==envelope.rawBytes||await digest(bytes)!==envelope.sha256)throw Error('雲端備份完整性檢查失敗，未還原任何資料');
+ return validateBackup(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)));
+}
+async function packCloud(payload){
+ const text=JSON.stringify(payload),bytes=new TextEncoder().encode(text);if(bytes.length<=CLOUD_LIMIT)return {content:text,rawBytes:bytes.length,storedBytes:bytes.length};
+ if(bytes.length>MAX_BACKUP_BYTES)throw Error('備份超過目前可處理大小，請先下載本機備份並聯絡管理者調整雲端儲存');
+ if(!root.fflate)throw Error('備份壓縮元件未載入，請重新整理後再試');
+ status('saving','資料較多，正在壓縮備份；本機可繼續開單');
+ let zipped;if(root.CompressionStream){const stream=new Blob([bytes]).stream().pipeThrough(new root.CompressionStream('gzip'));zipped=new Uint8Array(await new Response(stream).arrayBuffer());}else{await new Promise(r=>setTimeout(r,0));zipped=root.fflate.gzipSync(bytes);}
+ const content=JSON.stringify({format:'salon-pos-gzip-v1',rawBytes:bytes.length,sha256:await digest(bytes),data:toBase64(zipped)}),storedBytes=new TextEncoder().encode(content).length;
+ if(storedBytes>CLOUD_LIMIT)throw Error('壓縮後仍有 '+Math.ceil(storedBytes/1024)+' KB，超過目前單筆備份安全容量（879 KB）；請先下載本機備份，再調整雲端儲存方式。這不是帳號總容量已滿');
+ if(JSON.stringify(await unpackCloud(content))!==text)throw Error('備份壓縮驗證失敗，未上傳雲端');
+ return {content,rawBytes:bytes.length,storedBytes};
+}
 async function cloudBackup(settings,manual=false){if(cloudBusy)throw Error('雲端備份處理中，請稍候');clearTimeout(cloudTimer);const startRevision=revision;cloudBusy=true;status('saving','雲端備份中，本機可繼續開單');try{
  const url=cloudURL(settings),metaKey=PREFIX+'cloud:'+settings.shopID+':'+settings.syncToken;const meta=read(metaKey,{});
- if(!manual&&!meta.updateTime)throw Error('請先手動完成一次雲端備份，再開啟自動備份');
+ if(!manual&&(!meta.updateTime||meta.confirmed===false))throw Error('請先手動完成一次雲端備份，再開啟自動備份');
  const r=await fetch(url);let current=null;if(r.status!==404)current=await responseJSON(r);
  if(current&&meta.updateTime&&current.updateTime!==meta.updateTime)throw Error('雲端已被其他裝置更新，請先核對，未覆蓋備份');
  if(!manual&&current&&!meta.updateTime)throw Error('請先核對既有雲端資料');
- const payload=backupPayload();payload.settings={...payload.settings,...settings};const content=JSON.stringify(payload);if(new TextEncoder().encode(content).length>900000)throw Error('備份接近雲端容量上限，請先下載備份並聯絡管理者');
+ const payload=backupPayload();payload.settings={...payload.settings,...settings};const {content,rawBytes,storedBytes}=await packCloud(payload);
  const precondition=current?'&currentDocument.updateTime='+encodeURIComponent(current.updateTime):'&currentDocument.exists=false';
  const saved=await responseJSON(await fetch(url+'?updateMask.fieldPaths=content'+precondition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{content:{stringValue:content}}})}));
  if(saved.fields?.content?.stringValue!==content)throw Error('雲端回傳內容不符，尚未確認備份成功');
- const at=new Date().toISOString();localStorage.setItem(metaKey,JSON.stringify({at,updateTime:saved.updateTime}));status('saved','雲端備份成功 · '+dateTime(at).replace('T',' '),{at});return saved;
+ // Keep the write receipt if the verification GET fails, so a manual retry can
+ // safely compare against our own write without disabling conflict detection.
+ if(!saved.updateTime)throw Error('雲端未提供備份版本，尚未確認成功');
+ localStorage.setItem(metaKey,JSON.stringify({updateTime:saved.updateTime,confirmed:false}));
+ const checked=await responseJSON(await fetch(url,{cache:'no-store'}));if(checked.updateTime!==saved.updateTime||checked.fields?.content?.stringValue!==content)throw Error('上傳後的雲端讀回核對不符，請核對其他裝置，尚未確認備份成功');await unpackCloud(checked.fields.content.stringValue);
+ const at=new Date().toISOString();localStorage.setItem(metaKey,JSON.stringify({at,updateTime:saved.updateTime}));const sizeInfo=rawBytes>storedBytes?'（'+Math.ceil(rawBytes/1024)+' → '+Math.ceil(storedBytes/1024)+' KB）':'';status('saved','雲端備份成功'+sizeInfo+' · '+dateTime(at).replace('T',' '),{at,rawBytes,storedBytes});return saved;
  }catch(e){status('error',e.message);throw e;}finally{cloudBusy=false;if(revision!==startRevision&&read(DATA.settings,{}).autoCloudBackup)scheduleCloud();}}
-async function cloudDownload(settings){return validateBackup(JSON.parse((await responseJSON(await fetch(cloudURL(settings)))).fields.content.stringValue));}
+async function cloudDownload(settings){return unpackCloud((await responseJSON(await fetch(cloudURL(settings),{cache:'no-store'}))).fields?.content?.stringValue);}
 function scheduleCloud(){clearTimeout(cloudTimer);const settings=read(DATA.settings,{});if(!settings.autoCloudBackup){status('pending','資料已存本機；雲端需手動備份');return;}status('pending','資料已存本機，等待背景備份');cloudTimer=setTimeout(()=>cloudBackup(read(DATA.settings,{})).catch(()=>{}),4000);}
 root.addEventListener?.('storage',e=>{if(e.key){cache.delete(e.key);emit(e.key);}else for(const key of listeners.keys()){cache.delete(key);emit(key);}});
 root.addEventListener?.('salon-local-update',e=>{cache.delete(e.key);emit(e.key);});

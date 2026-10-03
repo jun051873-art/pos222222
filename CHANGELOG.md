@@ -1,3 +1,11 @@
+# 18.9 cloud backup hotfix — 2026-10-04 / 1004.1
+
+Fixes the misleading 900 KB guard that blocked large backups before any upload. Backups larger than that threshold are gzip-compressed into a versioned JSON envelope using native CompressionStream where available and bundled fflate 0.8.2 otherwise. Compressed content must still fit the conservative single-document limit. No Firestore paths, rules, account quotas or shop records are changed.
+
+SHA-256 and a local round trip validate compressed payloads. A separate uncached GET verifies the saved cloud document before reporting success. Failed verification keeps a write receipt for safe manual retry but cannot enable background backup. Small/legacy JSON backups remain readable; local downloads stay uncompressed. Refresh all devices before restoring compressed cloud backups; old app versions cannot read the new format. Genuine oversized compressed backups show their size and require a future storage migration, rather than claiming the entire cloud account is full.
+
+Tests: >1 MiB / 8,000 multilingual order round trip, native/fallback gzip interoperability, integrity failure, independent readback failure, incompressible overflow without writes; existing checkout/UI/bridge regressions pass. Cloud requests are mocked; the actual shop payload, Firebase rules and production upload remain unverified until tested from the shop device.
+
 # 18.9.0 — 2026-10-03
 
 Fixes the remount-on-notification defect that discarded open carts. View components now have stable identities. Small drafts persist locally and pending orders remain durable until checkout commits. Checkout, revisions and inventory changes use a recoverable local write-ahead journal, with validation and duplicate-draft protection. Existing salon_* storage keys are preserved; no automatic migration or cloud upload runs on first load.
