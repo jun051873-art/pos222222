@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 const PREFIX='aether-pos-transfer-v1:',receiptPrefix=PREFIX+'receipt:',packetPrefix=PREFIX+'packet:';
-const read=(key,fallback)=>{const s=localStorage.getItem(key);if(s===null)return fallback;try{return JSON.parse(s);}catch{throw Error('資料格式異常，請先備份並停止匯入：'+key);}};
+const read=(key,fallback)=>{const s=localStorage.getItem(key);if(s===null)return fallback;try{return root.SalonStorageCodec?root.SalonStorageCodec.parse(s):JSON.parse(s);}catch{throw Error('資料格式異常，請先備份並停止匯入：'+key);}};
 const money=v=>{if(v===null||v===undefined||v==='')throw Error('請填寫金額');const n=Number(v);if(!Number.isFinite(n)||n<0||n>1e7||Math.abs(n*100-Math.round(n*100))>.00001)throw Error('金額需為有效數字，最多兩位小數');return Math.round(n*100);};
 const norm=s=>String(s||'').normalize('NFKC').replace(/\s+/g,'').toLowerCase();
 const sameName=(list,name)=>{const a=list.filter(x=>norm(x.name)===norm(name));return a.length===1?a[0].id:'';};
@@ -47,7 +47,7 @@ function validate(p){legacy.validate(p.version===2&&!p.services.length&&p.produc
 const comparable=p=>p.version===2?JSON.stringify([legacy.comparable(p),p.customer,p.products,p.serviceAmount]):legacy.comparable(p);
 function send(p){validate(p);const old=B.read(K+(p.version===2?'packet2:':'packet:')+p.id,null),r=B.receipt(p.id);if(r?.status==='posted'){if(old&&comparable(old)!==comparable(p))throw Error('此筆已入帳且資料不同，請查原單，不能重新開單');return 'posted';}localStorage.setItem(K+(p.version===2?'packet2:':'packet:')+p.id,JSON.stringify(p));if(p.version===2)localStorage.removeItem(K+'packet:'+p.id);return 'queued';}
 // A durable write-ahead journal is completed before any subsequent POS write.
-function recover(){const j=B.read(K+'journal',null);if(!j)return;for(const [k,v]of Object.entries(j.after))localStorage.setItem(k,JSON.stringify(v));localStorage.removeItem(K+'journal');}
+function recover(){const j=B.read(K+'journal',null);if(!j)return;for(const [k,v]of Object.entries(j.after))localStorage.setItem(k,root.SalonStorageCodec?root.SalonStorageCodec.stringify(v):JSON.stringify(v));localStorage.removeItem(K+'journal');}
 function commit(after){recover();const before={};for(const k of Object.keys(after))before[k]=B.read(k,null);localStorage.setItem(K+'last-full-backup',JSON.stringify({at:new Date().toISOString(),before}));localStorage.setItem(K+'journal',JSON.stringify({after}));recover();if(typeof window!=='undefined')for(const k of Object.keys(after))window.dispatchEvent(new StorageEvent('salon-local-update',{key:k}));}
 const snapshot=()=>JSON.stringify([...keys,'salon_stylists'].map(k=>B.read(k,k==='salon_settings'?{}:[])));
 async function post(p,rows,method,ack,linkedId='',choice){
@@ -86,4 +86,5 @@ commit({salon_stylists:staff,salon_transactions:tx,salon_services:defs,salon_cus
 const packets=()=>{const all=[...legacy.packets(),...Object.keys(localStorage).filter(k=>k.startsWith(K+'packet2:')).map(k=>B.read(k,null)).filter(Boolean)];return [...new Map(all.map(p=>[p.id,p])).values()].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));};
 Object.assign(B,{sameId,byId,packets,validate,comparable,send,post,candidates,cname,phone,linkKey,recover,commit,snapshot});
 })(typeof window!=='undefined'?window:globalThis);
+
 

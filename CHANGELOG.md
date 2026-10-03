@@ -1,3 +1,11 @@
+# 18.9 restore capacity and overwrite guard — 2026-10-04 / 1004.2
+
+Large local records, restore snapshots and write-ahead journals now use a versioned lossless gzip codec. Plain JSON remains readable and JSON exports remain plain. Restore compacts only this POS's keys, includes its pre-restore snapshot in the same journal, and checks peak write capacity before changing data. Unrelated applications sharing the origin are not cleared. The shared recovery reader supports compressed journals and values. All active POS tabs must be refreshed before using this version; older code cannot read compressed local values. Do not roll back storage readers without first exporting JSON.
+
+Requested cloud overwrite guard applies to manual and automatic uploads: transactions, customers, expenses, inventory logs, services/products and staff cannot decrease in count or omit previously saved record IDs. Equal complete datasets may update and complete supersets may grow. Pending orders and drafts are transient and exempt. Consequently intentional deletions of protected records also block upload; there is no bypass button. Existing remote revision preconditions still protect against races. Successful cloud restore records the downloaded revision, disables background uploads on the receiving device, and retains the selected destination.
+
+Tests reproduce the previous quota failure with a nearly full localStorage mock, then verify a complete 8,000-record restore with original snapshot, pending/draft and reload. Insufficient capacity rejects before data writes; interrupted compressed commits recover. New-device, equal-count/different-ID, automatic upload, complete growth, restore baseline and concurrent-device protections pass. Existing checkout/UI/bridge tests remain passing. The user's actual iPhone storage and cloud contents have not been accessed; verify restore on that device after deployment.
+
 # 18.9 cloud backup hotfix — 2026-10-04 / 1004.1
 
 Fixes the misleading 900 KB guard that blocked large backups before any upload. Backups larger than that threshold are gzip-compressed into a versioned JSON envelope using native CompressionStream where available and bundled fflate 0.8.2 otherwise. Compressed content must still fit the conservative single-document limit. No Firestore paths, rules, account quotas or shop records are changed.

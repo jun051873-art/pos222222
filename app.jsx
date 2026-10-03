@@ -294,7 +294,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1004.1</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1004.2</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
@@ -464,7 +464,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
     // --- 修正：重新命名專屬函式，防止與全域 syncToCloud 衝突導致客資開單凍結 ---
     const [cloudWorking,setCloudWorking]=useState(false);
     const handleSettingsBackup=async()=>{if(cloudWorking)return;setCloudWorking(true);try{await saveCloudSettings();await SalonStore.cloudBackup({...safeSettings,shopID:localShopID.trim(),syncToken:localSyncToken.trim()},true);showToast('雲端備份已確認成功');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
-    const handleSettingsRestore=async()=>{if(cloudWorking)return;setCloudWorking(true);try{const data=await SalonStore.cloudDownload({shopID:localShopID.trim(),syncToken:localSyncToken.trim()});if(!confirm('雲端備份：'+(data.lastUpdated?SalonStore.dateTime(data.lastUpdated):'日期未提供')+'\n訂單 '+data.transactions.length+' 筆／顧客 '+data.customers.length+' 位\n確定還原？會先保留目前資料的還原前副本。'))return;await SalonStore.restore(data);showToast('還原完成，請重新開啟開單頁');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
+    const handleSettingsRestore=async()=>{if(cloudWorking)return;setCloudWorking(true);try{const data=await SalonStore.cloudDownload({shopID:localShopID.trim(),syncToken:localSyncToken.trim()});if(!confirm('雲端備份：'+(data.lastUpdated?SalonStore.dateTime(data.lastUpdated):'日期未提供')+'\n訂單 '+data.transactions.length+' 筆／顧客 '+data.customers.length+' 位\n確定還原？會先保留目前資料的還原前副本。'))return;await SalonStore.restore(data);showToast('還原完成；此裝置的自動備份保持關閉');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
 
     const _addCategory = () => { if(categoryInput.trim() && !safeSettings.categories.includes(categoryInput.trim())) { setSettings({...safeSettings, categories: [...safeSettings.categories, categoryInput.trim()]}); setCategoryInput(''); } };
     const _addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings({...safeSettings, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]}); setExpenseTypeInput(''); } };
@@ -533,7 +533,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 </div>
             </div>
 
-            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>setSettings({...safeSettings,autoCloudBackup:e.target.checked})}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份；網路失敗不會取消已完成的單據。雲端有其他裝置的新版本時會停止覆蓋並提醒。</p></div>
+            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>setSettings({...safeSettings,autoCloudBackup:e.target.checked})}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份。防誤覆蓋已啟用：訂單、顧客、支出、庫存紀錄、服務商品及人員，筆數少於雲端或缺少原有資料時，禁止上傳。刪除這些資料後也會被攔下；掛單與草稿不比較筆數。</p></div>
             <AppearanceSettings/>
             {/* 營業項目管理列表 */}
             <div className="card p-8">
@@ -633,7 +633,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 <div className="flex gap-4 flex-wrap">
                     <button onClick={_exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button>
                     <label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={_importBackup}/></label>
-                    {localStorage.getItem(SalonStore.PREFIX+'before-restore')&&<button className="btn btn-secondary" onClick={()=>downloadJSON(JSON.parse(localStorage.getItem(SalonStore.PREFIX+'before-restore')),'salon_before_restore.json')}>下載還原前副本</button>}
+                    {localStorage.getItem(SalonStore.PREFIX+'before-restore')&&<button className="btn btn-secondary" onClick={()=>downloadJSON(SalonStore.read(SalonStore.PREFIX+'before-restore',null),'salon_before_restore.json')}>下載還原前副本</button>}
                     <button onClick={() => confirmAction('重置系統', '這將清空所有資料！', () => { Object.values(SalonStore.DATA).forEach(key=>localStorage.removeItem(key));localStorage.removeItem(SalonStore.DRAFT);window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button>
                 </div>
             </div>
