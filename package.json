@@ -1,0 +1,7 @@
+{
+  "name": "special-space-salon-pos",
+  "version": "18.9.0",
+  "private": true,
+  "scripts": {"build": "node scripts/build.cjs", "test": "node tests/pos-runtime.cjs && node tests/pos-ui.cjs && node tests/bridge-regression.cjs"},
+  "devDependencies": {"@babel/core":"8.0.6","@babel/plugin-transform-react-jsx":"8.0.1","react":"18.3.1","react-dom":"18.3.1","jsdom":"26.1.0","tailwindcss":"3.4.17"}
+}
