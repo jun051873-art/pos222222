@@ -220,8 +220,9 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
     // ==========================================
 
             const safeSettings = {
+                ...settings,
                 categories: settings.categories || DEFAULT_CATEGORIES,
-                expenseTypes: settings.expenseTypes || DEFAULT_EXPENSE_TYPES,
+                expenseTypes: [...new Set([...(settings.expenseTypes||DEFAULT_EXPENSE_TYPES),'進貨付款','薪資發放'])],
                 commissionRates: settings.commissionRates || DEFAULT_COMMISSION,
                 deductCostBeforeCommission: settings.deductCostBeforeCommission ?? true,
                 autoBackup: settings.autoBackup ?? false,
@@ -231,19 +232,19 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             };
 
             // Global Safe Data Accessors (Data Guards)
-            const safeServices = Array.isArray(services) ? services : [];
-            const safeStylists = Array.isArray(stylists) ? stylists : [];
-            const safeCustomers = useMemo(()=>Array.isArray(customers)?customers.map(c=>({...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:c.visits??c.Visits??0,totalSpend:c.totalSpend??c.TotalSpend??0})):[],[customers]);
-            useEffect(()=>{document.documentElement.dataset.salonTheme=settings.appearance?.theme||'pearl';document.documentElement.dataset.salonText=settings.appearance?.textSize||'standard';document.documentElement.dataset.salonMotion=settings.appearance?.motion===false?'off':'on';document.documentElement.dataset.salonDensity=settings.appearance?.density||'comfortable';},[settings.appearance]);
+            const safeServices = Array.isArray(services) ? services.filter(x=>!x.archived) : [];
+            const safeStylists = Array.isArray(stylists) ? stylists.filter(x=>!x.archived) : [];
+            const safeCustomers = useMemo(()=>Array.isArray(customers)?customers.filter(x=>!x.archived).map(c=>({...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:c.visits??c.Visits??0,totalSpend:c.totalSpend??c.TotalSpend??0})):[],[customers]);
+            useEffect(()=>{document.documentElement.dataset.salonTheme=settings.appearance?.theme||'glass';document.documentElement.dataset.salonText=settings.appearance?.textSize||'standard';document.documentElement.dataset.salonMotion=settings.appearance?.motion===false?'off':'on';document.documentElement.dataset.salonDensity=settings.appearance?.density||'comfortable';document.documentElement.dataset.salonShape=settings.appearance?.shape||'soft';document.documentElement.dataset.salonPalette=settings.appearance?.palette||'slate';document.documentElement.dataset.salonWeight=settings.appearance?.weight||'normal';document.documentElement.dataset.salonEffect=settings.appearance?.effect||'light';document.documentElement.style.setProperty('--salon-accent',settings.appearance?.accent||'#526675');document.documentElement.style.setProperty('--salon-columns',settings.appearance?.columns||3);},[settings.appearance]);
             const safeTransactions = Array.isArray(transactions) ? transactions : [];
             const safeInventoryLogs = Array.isArray(inventoryLogs) ? inventoryLogs : [];
-            const safeExpenses = Array.isArray(expenses) ? expenses : [];
+            const safeExpenses = Array.isArray(expenses) ? expenses.filter(x=>!x.archived) : [];
             const safePendingOrders = Array.isArray(pendingOrders) ? pendingOrders : [];
 
             const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
             const confirmAction = (title, message, action) => {
-                setConfirmDialog({ isOpen: true, title, message, onConfirm: async () => { await action(); setConfirmDialog(prev => ({ ...prev, isOpen: false })); }, onCancel: () => setConfirmDialog(prev => ({ ...prev, isOpen: false })) });
+                setConfirmDialog({ isOpen: true, title, message, onConfirm: async () => { try{await action();setConfirmDialog(prev=>({...prev,isOpen:false}));}catch(e){showToast(e.message||'儲存失敗，請重試','error');} }, onCancel: () => setConfirmDialog(prev => ({ ...prev, isOpen: false })) });
             };
 
             const showToast = (msg, type = 'success') => {
@@ -294,7 +295,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1004.2</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1005.0</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
@@ -353,7 +354,7 @@ const EditOrderModal = ({ order, onClose, onSave }) => {
 const {setCustomers,safeCustomers,showToast,safeStylists}=React.useContext(SalonContext);
 
     // 💡 關鍵：我們建立一個與外部完全分離的 Local State
-    const [form, setForm] = useState(() => JSON.parse(JSON.stringify(order))); 
+    const [form, setForm] = useState(() => ({...JSON.parse(JSON.stringify(order)),items:(order.items||[]).map((i,n)=>({...i,cartId:i.cartId||order.id+'-line-'+n}))})); 
     
     // 💡 關鍵：防止輸入框在修改時觸發整個元件的重新對焦與重繪
     const updateItem = useCallback((cartId, field, value) => {
@@ -382,7 +383,7 @@ const {setCustomers,safeCustomers,showToast,safeStylists}=React.useContext(Salon
         if (!inputPhone) return;
         const newId = generateId();
         const newCustomer = { id: newId, name: inputName, phone: inputPhone, notes: '由查單介面轉入', visits: 0, totalSpend: 0, tags: [] };
-        if(safeCustomers.some(c=>c.phone===inputPhone)){showToast('已有相同電話的會員，請先核對','error');return;}
+        if(safeCustomers.some(c=>(c.phone||'').replace(/\D/g,'')===inputPhone.replace(/\D/g,''))){showToast('已有相同電話的會員，請先核對','error');return;}
         try{await setCustomers([...safeCustomers, newCustomer]);}catch{return;}
         setForm({ ...form, customerId: newId, customerName: inputName });
         showToast(`已成功建立會員：${newCustomer.name}`);
@@ -409,7 +410,7 @@ const {setCustomers,safeCustomers,showToast,safeStylists}=React.useContext(Salon
                         {form.items.map((item) => (
                             // 💡 強制使用 item.cartId 作為渲染 Key，確保 DOM 不會被清空重繪
                             <div key={item.cartId} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-slate-50">
-                                <div className="flex-1"><div className="font-bold text-sm">{item.name}</div></div>
+                                <div className="flex-1"><div className="font-bold text-sm">{item.name}</div><select aria-label={item.name+'設計師'} className="input-field text-sm" value={item.stylistId} onChange={e=>updateItem(item.cartId,'stylistId',e.target.value)}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                                 <div className="w-24">
                                     <label className="text-[10px] block text-slate-400">售價</label>
                                     <input type="number" className="input-field py-1 px-2 text-sm" value={item.price} onChange={e=>updateItem(item.cartId, 'price', Number(e.target.value))}/>
@@ -466,10 +467,10 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
     const handleSettingsBackup=async()=>{if(cloudWorking)return;setCloudWorking(true);try{await saveCloudSettings();await SalonStore.cloudBackup({...safeSettings,shopID:localShopID.trim(),syncToken:localSyncToken.trim()},true);showToast('雲端備份已確認成功');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
     const handleSettingsRestore=async()=>{if(cloudWorking)return;setCloudWorking(true);try{const data=await SalonStore.cloudDownload({shopID:localShopID.trim(),syncToken:localSyncToken.trim()});if(!confirm('雲端備份：'+(data.lastUpdated?SalonStore.dateTime(data.lastUpdated):'日期未提供')+'\n訂單 '+data.transactions.length+' 筆／顧客 '+data.customers.length+' 位\n確定還原？會先保留目前資料的還原前副本。'))return;await SalonStore.restore(data);showToast('還原完成；此裝置的自動備份保持關閉');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
 
-    const _addCategory = () => { if(categoryInput.trim() && !safeSettings.categories.includes(categoryInput.trim())) { setSettings({...safeSettings, categories: [...safeSettings.categories, categoryInput.trim()]}); setCategoryInput(''); } };
-    const _addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings({...safeSettings, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]}); setExpenseTypeInput(''); } };
-    const _removeCategory = cat => {if(safeServices.some(s=>s.category===cat)||safeTransactions.some(t=>(t.items||[]).some(i=>i.category===cat))){showToast('分類仍有項目或歷史單據，請保留以免漏列統計','error');return;}setSettings({...safeSettings,categories:safeSettings.categories.filter(c=>c!==cat)});};
-    const _removeExpenseType = (type) => setSettings({...safeSettings, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)});
+    const _addCategory = () => { if(categoryInput.trim() && !safeSettings.categories.includes(categoryInput.trim())) { setSettings(prev=>({...prev, categories: [...safeSettings.categories, categoryInput.trim()]})); setCategoryInput(''); } };
+    const _addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings(prev=>({...prev, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]})); setExpenseTypeInput(''); } };
+    const _removeCategory = cat => {if(safeServices.some(s=>s.category===cat)||safeTransactions.some(t=>(t.items||[]).some(i=>i.category===cat))){showToast('分類仍有項目或歷史單據，請保留以免漏列統計','error');return;}setSettings(prev=>({...prev, categories:safeSettings.categories.filter(c=>c!==cat)}));};
+    const _removeExpenseType = (type) => {if(safeExpenses.some(e=>e.type===type)){showToast('此分類仍有支出紀錄，請保留以免報表漏列','error');return;}setSettings(prev=>({...prev, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)}));};
     
     const _exportBackup=()=>{const payload=SalonStore.backupPayload();const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='salon_backup_'+getCurrentDateLocal()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('完整備份下載已啟動（包含掛單）');};
     const _importBackup=async event=>{const file=event.target.files[0];if(!file)return;try{const data=SalonStore.validateBackup(JSON.parse(await file.text()));if(!confirm('備份有 '+data.transactions.length+' 筆訂單、'+data.customers.length+' 位顧客，確定還原？'))return;await SalonStore.restore(data);showToast('資料已還原');}catch(e){showToast(e.message,'error');}finally{event.target.value='';}};
@@ -484,8 +485,8 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
     };
 
     const handleDeleteItem = (id) => {
-        confirmAction('刪除項目', '確定刪除？', () => {
-            setServices(safeServices.filter(s => s.id !== id)); showToast('項目已刪除');
+        confirmAction('停用項目', '停用後不再顯示於開單，歷史資料仍保留。', async () => {
+            try{await setServices(safeServices.filter(s => s.id !== id));showToast('項目已停用');}catch{}
         });
     };
 
@@ -525,16 +526,16 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 </div>
                 <div className="flex gap-4">
                     <button onClick={async()=>{try{await saveCloudSettings();showToast("連線設定已儲存，尚未傳送資料", "success");}catch(e){showToast("設定未儲存，請重新核對", "error");}}} className="btn btn-secondary">儲存連線設定</button><button disabled={cloudWorking} onClick={handleSettingsBackup} className="btn btn-primary flex-1 py-4 font-bold shadow-lg text-lg">
-                        <Upload size={20}/> 建立空間並備份
+                        <Upload size={20}/> 上傳本機資料到雲端
                     </button>
                     <button disabled={cloudWorking} onClick={handleSettingsRestore} className="btn btn-secondary flex-1 py-4 font-bold text-lg">
-                        <Download size={20}/> 下載恢復資料
+                        <Download size={20}/> 從雲端還原到此裝置
                     </button>
                 </div>
             </div>
 
-            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>setSettings({...safeSettings,autoCloudBackup:e.target.checked})}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份。防誤覆蓋已啟用：訂單、顧客、支出、庫存紀錄、服務商品及人員，筆數少於雲端或缺少原有資料時，禁止上傳。刪除這些資料後也會被攔下；掛單與草稿不比較筆數。</p></div>
-            <AppearanceSettings/>
+            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,autoCloudBackup:checked}));}}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份。防誤覆蓋已啟用：訂單、顧客、支出、庫存紀錄、服務商品及人員，筆數少於雲端或缺少原有資料時，禁止上傳。封存與作廢會保留原始識別碼，不會因筆數減少而阻擋備份；掛單與草稿不比較筆數。</p></div>
+            <AppearanceSettings/><ArchiveSettings/>
             {/* 營業項目管理列表 */}
             <div className="card p-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -591,7 +592,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
             <div className="card p-8">
                 <h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3>
                 <label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>setSettings({...safeSettings, deductCostBeforeCommission:e.target.checked})} className="w-5 h-5 accent-indigo-600"/> 
+                    <input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,deductCostBeforeCommission:checked}));}} className="w-5 h-5 accent-indigo-600"/> 
                     <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span>
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -634,7 +635,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                     <button onClick={_exportBackup} className="btn btn-primary"><Download size={18}/> 備份資料 (下載)</button>
                     <label className="btn btn-secondary cursor-pointer"><Upload size={18}/> 還原資料<input type="file" className="hidden" accept=".json" onChange={_importBackup}/></label>
                     {localStorage.getItem(SalonStore.PREFIX+'before-restore')&&<button className="btn btn-secondary" onClick={()=>downloadJSON(SalonStore.read(SalonStore.PREFIX+'before-restore',null),'salon_before_restore.json')}>下載還原前副本</button>}
-                    <button onClick={() => confirmAction('重置系統', '這將清空所有資料！', () => { Object.values(SalonStore.DATA).forEach(key=>localStorage.removeItem(key));localStorage.removeItem(SalonStore.DRAFT);window.location.reload(); })} className="btn btn-danger ml-auto"><RefreshCw size={18}/> 重置系統 (清空)</button>
+
                 </div>
             </div>
 
@@ -680,7 +681,7 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                 const [viewingCustomer, setViewingCustomer] = useState(null);
                 const [isEditing, setIsEditing] = useState(false);
                 const [editForm, setEditForm] = useState({});
-                const [filterStylist, setFilterStylist] = useState('all');
+                const [filterStylist, setFilterStylist] = useState('all');const [visibleCount,setVisibleCount]=useState(60);
 
                 const filtered = safeCustomers.filter(c => {
                     const matchSearch = (c.name||'').includes(searchTerm) || (c.phone||'').includes(searchTerm);
@@ -696,10 +697,10 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                 };
 
                 const handleDeleteCustomer = (id) => {
-                    confirmAction('刪除顧客', '確定要刪除此顧客資料？', () => {
-                        setCustomers(safeCustomers.filter(c => c.id !== id));
+                    confirmAction('封存顧客', '封存後保留消費紀錄，可在設定中恢復。', async () => {
+                        try{await setCustomers(safeCustomers.filter(c => c.id !== id));}catch{return;}
                         if (viewingCustomer && viewingCustomer.id === id) { setViewingCustomer(null); setIsEditing(false); }
-                        showToast('顧客資料已刪除');
+                        showToast('顧客資料已封存');
                     });
                 };
 
@@ -723,7 +724,7 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filtered.map(c => {
+                                {filtered.slice(0,visibleCount).map(c => {
                                     const isVip = (c.totalSpend || 0) > 10000;
                                     const stylistName = safeStylists.find(s => s.id === c.preferredStylistId)?.name || '未指定';
                                     const gender = c.gender || '女';
@@ -746,7 +747,7 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                             {filtered.length === 0 && <div className="text-center text-slate-400 py-20 bg-white rounded-xl border border-dashed">查無相關顧客資料</div>}
                         </div>
                         {isEditing && (<Modal title={editForm.id ? '編輯顧客資料' : '新增顧客'} onClose={()=>setIsEditing(false)}><div className="space-y-5"><div className="grid grid-cols-2 gap-5"><div><label className="text-xs font-bold text-slate-500 mb-1 block">姓名</label><input className="input-field" value={editForm.name||''} onChange={e=>setEditForm({...editForm, name:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">電話</label><input className="input-field" value={editForm.phone||''} onChange={e=>setEditForm({...editForm, phone:e.target.value})}/></div></div><div className="flex gap-2"><select className="input-field w-32" value={editForm.gender} onChange={e=>setEditForm({...editForm, gender:e.target.value})}><option value="女">女客</option><option value="男">男客</option><option value="兒童">兒童</option></select><div className="flex-1"><label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師</label><select className="input-field" value={editForm.preferredStylistId || ''} onChange={e=>setEditForm({...editForm, preferredStylistId: e.target.value})}><option value="">未指定</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div><div><label className="text-sm font-bold text-slate-500">生日</label><input type="date" className="input-field" value={editForm.birthday||''} onChange={e=>setEditForm({...editForm,birthday:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">備註事項</label><textarea className="input-field" rows="3" value={editForm.notes||''} onChange={e=>setEditForm({...editForm, notes:e.target.value})}/></div><button onClick={handleSave} className="btn btn-primary w-full py-3">儲存資料</button></div></Modal>)}
-                        {viewingCustomer && !isEditing && (<Modal title={`${viewingCustomer.name} 的消費紀錄`} onClose={()=>setViewingCustomer(null)} size="max-w-2xl"><div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200"><div><div className="text-sm text-slate-500">會員電話</div><div className="font-bold font-mono text-lg">{viewingCustomer.phone}</div><div>生日：{viewingCustomer.birthday||'未填寫'}</div></div><div className="text-right"><div className="text-sm text-slate-500">歷史總消費</div><div className="font-black text-2xl text-indigo-600">{formatCurrency(viewingCustomer.totalSpend || 0)}</div></div></div><div className="text-sm text-slate-500">專屬設計師: <span className="font-bold text-slate-800">{safeStylists.find(s=>s.id===viewingCustomer.preferredStylistId)?.name || '未指定'}</span></div><div className="border-t pt-4"><h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Settings size={18}/> 近期消費明細</h4><div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">{safeTransactions.filter(t=>t.customerId===viewingCustomer.id).length===0?(<div className="text-center text-slate-400 py-8">尚無消費紀錄</div>):(safeTransactions.filter(t=>t.customerId===viewingCustomer.id).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(<div key={t.id} className="border p-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center"><div><div className="font-bold text-slate-700">{new Date(t.date).toLocaleDateString()} <span className="text-xs text-slate-400 font-normal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><div className="text-sm text-slate-500 mt-1 flex gap-2">{(t.items||[]).map((i,idx)=><span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-xs">{i.name}</span>)}</div></div><div className="text-right"><div className="font-bold text-slate-800">{formatCurrency(t.total)}</div><div className="text-xs text-slate-400">{safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未知設計師'}</div></div></div>)))}</div></div><div className="flex gap-2 pt-2"><button onClick={()=>{setEditForm(viewingCustomer); setIsEditing(true);}} className="btn btn-secondary flex-1">編輯資料</button><button onClick={()=>handleDeleteCustomer(viewingCustomer.id)} className="btn btn-danger flex-1">刪除會員</button></div></div></Modal>)}
+                        <button className="btn btn-secondary my-3" hidden={visibleCount>=filtered.length} onClick={()=>setVisibleCount(n=>n+60)}>載入更多顧客（共 {filtered.length} 位）</button>{viewingCustomer && !isEditing && (<Modal title={`${viewingCustomer.name} 的消費紀錄`} onClose={()=>setViewingCustomer(null)} size="max-w-2xl"><div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200"><div><div className="text-sm text-slate-500">會員電話</div><div className="font-bold font-mono text-lg">{viewingCustomer.phone}</div><div>生日：{viewingCustomer.birthday||'未填寫'}</div></div><div className="text-right"><div className="text-sm text-slate-500">歷史總消費</div><div className="font-black text-2xl text-indigo-600">{formatCurrency(viewingCustomer.totalSpend || 0)}</div></div></div><div className="text-sm text-slate-500">專屬設計師: <span className="font-bold text-slate-800">{safeStylists.find(s=>s.id===viewingCustomer.preferredStylistId)?.name || '未指定'}</span></div><div className="border-t pt-4"><h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Settings size={18}/> 近期消費明細</h4><div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">{safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).length===0?(<div className="text-center text-slate-400 py-8">尚無消費紀錄</div>):(safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(<div key={t.id} className="border p-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center"><div><div className="font-bold text-slate-700">{new Date(t.date).toLocaleDateString()} <span className="text-xs text-slate-400 font-normal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><div className="text-sm text-slate-500 mt-1 flex gap-2">{(t.items||[]).map((i,idx)=><span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-xs">{i.name}</span>)}</div></div><div className="text-right"><div className="font-bold text-slate-800">{formatCurrency(t.total)}</div><div className="text-xs text-slate-400">{safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未知設計師'}</div></div></div>)))}</div></div><div className="flex gap-2 pt-2"><button onClick={()=>{setEditForm(viewingCustomer); setIsEditing(true);}} className="btn btn-secondary flex-1">編輯資料</button><button onClick={()=>handleDeleteCustomer(viewingCustomer.id)} className="btn btn-danger flex-1">封存會員</button></div></div></Modal>)}
                     </div>
                 );
             };
@@ -774,7 +775,7 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
                     showToast('人員資料已儲存'); 
                 };
 
-                const deleteStaff=id=>{if(SalonStore.all().transactions.some(t=>(t.items||[]).some(i=>i.stylistId===id))){showToast('此人員有歷史業績，請保留資料以免薪資報表漏列','error');return;}confirmAction('刪除人員','確定刪除沒有歷史單據的人員？',()=>setStylists(safeStylists.filter(s=>s.id!==id)));};
+                const deleteStaff=id=>{if(SalonStore.all().transactions.some(t=>(t.items||[]).some(i=>i.stylistId===id))){showToast('此人員有歷史業績，請保留資料以免薪資報表漏列','error');return;}confirmAction('停用人員','停用人員並保留封存資料？',()=>setStylists(safeStylists.filter(s=>s.id!==id)));};
                 
                 return (
                     <div className="p-6 md:p-10 h-full overflow-y-auto">
@@ -857,7 +858,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
             const [draftId,setDraftId]=useState(initialDraft.draftId||crypto.randomUUID());
             const [pendingId,setPendingId]=useState(initialDraft.pendingId||'');
             const [saving,setSaving]=useState(false);const savingRef=React.useRef(false);
-            const [selectedCategory, setSelectedCategory] = useState('全部');
+            const [selectedCategory, setSelectedCategory] = useState('全部');const [serviceSearch,setServiceSearch]=useState('');const [paymentChoice,setPaymentChoice]=useState('現金');const [cashReceived,setCashReceived]=useState('');
             const [selectedStylist, setSelectedStylist] = useState(initialDraft.selectedStylist||safeStylists[0]?.id||'');
             const [selectedAssistant, setSelectedAssistant] = useState(initialDraft.selectedAssistant||'');
             const [selectedCustomer, setSelectedCustomer] = useState(initialDraft.selectedCustomer||null);
@@ -883,7 +884,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                 const stylistObj = safeStylists.find(s => s.id === newStylistId);
                 const stylistName = stylistObj ? stylistObj.name : '未指定';
 
-                if (cart.length > 0) {
+                if (cart.length > 0 && confirm('是否將目前所有項目的設計師一起更換？按取消只更改後續新增項目。')) {
                     const updatedCart = cart.map(item => ({
                         ...item,
                         stylistId: newStylistId,
@@ -903,10 +904,10 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
             }, [safeCustomers, custSearch]);
 
             const filteredServices = useMemo(() => {
-                let items = safeServices.filter(s => !s.isInternal);
+                let items = safeServices.filter(s => !s.isInternal && (s.name||'').includes(serviceSearch));
                 if (selectedCategory !== '全部') items = items.filter(s => s.category === selectedCategory);
                 return items;
-            }, [safeServices, selectedCategory]);
+            }, [safeServices, selectedCategory,serviceSearch]);
 
             const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price - (item.discount||0)), 0), [cart]);
 
@@ -985,17 +986,10 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                                 <div className="space-y-2 pt-2">
                                     <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
                                    <div className="grid grid-cols-2 gap-2">
-    {/* 定義支付方式與顏色對照 */}
-    {[
-        { name: '現金', color: 'bg-amber-100 text-amber-900 border-amber-200' },
-        { name: '信用卡', color: 'bg-violet-100 text-violet-900 border-violet-200' },
-        { name: '街口支付', color: 'bg-red-100 text-red-900 border-red-200' },
-        { name: 'LINE Pay', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
-        { name: '轉帳', color: 'bg-blue-100 text-blue-900 border-blue-200' }
-    ].map((item) => (
+    {(safeSettings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).map(name=>({name,color:paymentChoice===name?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200'})).map((item) => (
         <button 
             key={item.name} 
-            disabled={saving} onClick={() => handleCheckout(item.name)}
+            disabled={saving} aria-pressed={paymentChoice===item.name} onClick={() => setPaymentChoice(item.name)}
             className={`py-3 rounded-xl border font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 ${item.color}`}
         >
             {item.name === '現金' && <Banknote size={16}/>}
@@ -1005,6 +999,8 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
         </button>
     ))}
 </div>
+{paymentChoice==='現金'&&<label className="block text-left mt-3 text-sm">實收金額（可不填）<input aria-label="實收金額" type="number" min={cartTotal} className="input-field" value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/>{cashReceived!==''&&<span>找零：{formatCurrency(Math.max(0,Number(cashReceived)-cartTotal))}</span>}</label>}
+<button className="btn btn-primary w-full mt-3" disabled={saving||(paymentChoice==='現金'&&cashReceived!==''&&Number(cashReceived)<cartTotal)} onClick={()=>handleCheckout(paymentChoice)}>{saving?'正在儲存…':'確認收款並完成結帳'}</button>
                                 </div>
                                 <button onClick={() => setShowCheckout(false)} className="btn btn-secondary w-full py-2.5 mt-2 text-sm">取消返回</button>
                             </div>
@@ -1054,7 +1050,7 @@ setSelectedCustomer(c); // 🚀 直接把帶有大寫 Name 和 Phone 的原始�
 setAdHocCustomerName('');
 setAdHocGender(c.Gender || c.gender || '女');
         
-if (c.preferredStylistId) {
+if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferredStylistId)) && (!cart.length||confirm('是否將目前項目改由這位顧客的專屬設計師服務？'))) {
             setSelectedStylist(c.preferredStylistId);setCart(prev=>prev.map(i=>({...i,stylistId:c.preferredStylistId,stylistName:safeStylists.find(s=>s.id===c.preferredStylistId)?.name||''}))); 
         }
         
@@ -1123,10 +1119,10 @@ if (c.preferredStylistId) {
                                     </select>
                                 </div>
                             </div>
-                            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
+                            <input aria-label="搜尋服務或商品" className="input-field mb-3" placeholder="搜尋服務或商品…" value={serviceSearch} onChange={e=>setServiceSearch(e.target.value)}/><div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar category-tabs">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                            <div className="service-grid grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                                 {filteredServices.map(s => { 
                                     const inCartCount = cart.filter(i => i.id === s.id).length; 
                                     const remaining = s.stock !== null ? s.stock - inCartCount : null; 
@@ -1182,7 +1178,7 @@ if (c.preferredStylistId) {
                         totalSpend: 0, 
                         tags: [] 
                     };
-                    if(safeCustomers.some(c=>c.phone===phone)){showToast('已有相同電話會員，請用搜尋選取','error');return;}
+                    if(safeCustomers.some(c=>(c.phone||'').replace(/\D/g,'')===phone.replace(/\D/g,''))){showToast('已有相同電話會員，請用搜尋選取','error');return;}
                     try{await setCustomers([...safeCustomers, newCust]);}catch{return;}
                     setSelectedCustomer(newCust);
                     setAdHocCustomerName('');
@@ -1209,7 +1205,7 @@ if (c.preferredStylistId) {
     📱 會員電話：{selectedCustomer.Phone || selectedCustomer.phone || '無電話紀錄'}
 </div>
 <div className="text-[10px] text-indigo-200 mt-0.5">
-    歷史消費: {formatCurrency(selectedCustomer.TotalSpend || selectedCustomer.totalSpend || 0)} ({selectedCustomer.Visits || selectedCustomer.visits || 0}次)
+    歷史消費: {formatCurrency(selectedCustomer.totalSpend ?? selectedCustomer.TotalSpend ?? 0)} ({selectedCustomer.visits ?? selectedCustomer.Visits ?? 0}次)
 </div>
         </div>
         ...
@@ -1269,7 +1265,7 @@ if (c.preferredStylistId) {
                 <span className="text-slate-700 font-black font-mono">{formatCurrency(item.price)}</span>
             </div>
             
-            <div className="flex justify-end gap-2 mt-2">
+            <div className="flex gap-2 mt-2"><select aria-label={item.name+'服務人員'} className="input-field text-sm" value={item.stylistId} onChange={e=>{const person=safeStylists.find(s=>String(s.id)===e.target.value);setCart(prev=>prev.map(c=>c.cartId===item.cartId?{...c,stylistId:person.id,stylistName:person.name}:c));}}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select><button className="btn btn-secondary text-xs" onClick={()=>{const n=prompt('折扣金額（不是折數）',item.discount||0);if(n!==null&&n.trim()!==''&&Number.isFinite(Number(n))&&Number(n)>=0&&Number(n)<=item.price)setCart(prev=>prev.map(c=>c.cartId===item.cartId?{...c,discount:Number(n)}:c));}}>折扣 {item.discount||0}</button></div><div className="flex justify-end gap-2 mt-2">
                 {/* 絕對不會閃跳的修改金額按鈕 */}
                 <button 
                     type="button"
@@ -1338,7 +1334,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                 const [qty, setQty] = useState(1);
                 const [cost, setCost] = useState(0);
                 const [note, setNote] = useState('');
-                const [supplier, setSupplier] = useState(''); // 新增：進貨廠商狀態
+                const [recordPayment,setRecordPayment]=useState(false);const [supplier, setSupplier] = useState(''); // 新增：進貨廠商狀態
                 const [internalUseType, setInternalUseType] = useState('shop'); // 新增：店用(shop) 或 設計師(designer)
                 const [selectedStaffId, setSelectedStaffId] = useState(''); // 新增：領用設計師 ID
                 const [adjustType, setAdjustType] = useState('inc');
@@ -1373,7 +1369,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                 };
                 
                 const [inventorySaving,setInventorySaving]=useState(false);const inventoryLock=React.useRef(false);
-                const handleInventoryAction=async actionType=>{if(!targetItem||inventoryLock.current)return;inventoryLock.current=true;setInventorySaving(true);try{await SalonStore.inventory({id:targetItem.id,action:actionType,qty,cost,note,supplier,internalUseType,staffId:selectedStaffId,adjustType});setTargetItem(null);setQty(1);setCost(0);setNote('');setSupplier('');setSelectedStaffId('');setInternalUseType('shop');setMode('list');showToast('庫存與異動紀錄已儲存');}catch(e){showToast(e.message,'error');}finally{inventoryLock.current=false;setInventorySaving(false);}};
+                const handleInventoryAction=async actionType=>{if(!targetItem||inventoryLock.current)return;inventoryLock.current=true;setInventorySaving(true);try{await SalonStore.inventory({id:targetItem.id,action:actionType,qty,cost,note,supplier,recordPayment,internalUseType,staffId:selectedStaffId,adjustType});setTargetItem(null);setQty(1);setCost(0);setNote('');setSupplier('');setSelectedStaffId('');setRecordPayment(false);setInternalUseType('shop');setMode('list');showToast('庫存與異動紀錄已儲存');}catch(e){showToast(e.message,'error');}finally{inventoryLock.current=false;setInventorySaving(false);}};
 
                 return (
                     <div className="p-6 h-full overflow-y-auto">
@@ -1515,7 +1511,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">這次進貨單價(成本)</label><input type="number" className="input-field bg-white text-lg font-bold" value={cost} onChange={e=>setCost(e.target.value)}/></div>
                                     </div>
                                     <div><label className="text-xs font-bold text-slate-500 mb-1 block">備註說明</label><input type="text" className="input-field bg-white" placeholder="選填，例如批號或效期" value={note} onChange={e=>setNote(e.target.value)}/></div>
-                                    <button disabled={inventorySaving} onClick={()=>handleInventoryAction('restock')} className="w-full py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg mt-2">確認入庫並更新成本</button>
+                                    <label className="flex gap-2 text-sm"><input type="checkbox" checked={recordPayment} onChange={e=>setRecordPayment(e.target.checked)}/>已付款，同時登記進貨現金支出（不重複列為銷貨成本）</label><button disabled={inventorySaving} onClick={()=>handleInventoryAction('restock')} className="w-full py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg mt-2">確認入庫並更新成本</button>
                                 </div>
                             </Modal>
                         )}
@@ -1568,8 +1564,9 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
             };
 
 const ReportView = () => {
-const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpenses,getThemeClasses,confirmAction}=React.useContext(SalonContext);
+const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpenses,getThemeClasses,confirmAction,settings,setSettings}=React.useContext(SalonContext);
 
+                const [rangeEnd,setRangeEnd]=useState(getCurrentDateLocal());
                 const [view, setView] = useState('dashboard');
                 const [reportMode, setReportMode] = useState('month'); 
                 const [queryDate, setQueryDate] = useState(getCurrentDateLocal().slice(0, 7)); // Default YYYY-MM
@@ -1579,6 +1576,7 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
                 const handleModeChange = (mode) => {
                     setReportMode(mode);
                     const now = getCurrentDateLocal();
+                    if(mode==='range')setQueryDate(now.slice(0,7)+'-01');
                     if (mode === 'day') setQueryDate(now);
                     else if (mode === 'month') setQueryDate(now.slice(0, 7));
                     else if (mode === 'year') setQueryDate(now.slice(0, 4));
@@ -1586,24 +1584,24 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
 
                 const reportTx = useMemo(() => {
                     return safeTransactions.filter(t => {
-                        if (!t.date) return false;
-                        const d = SalonStore.day(t.date);
+                        if (!t.date||t.voided) return false;
+                        const d = SalonStore.day(t.date);if(reportMode==='range')return d>=queryDate&&d<=rangeEnd;
                         if (reportMode === 'day') return d.startsWith(queryDate);
                         if (reportMode === 'month') return d.startsWith(queryDate);
                         if (reportMode === 'year') return d.startsWith(queryDate);
                         return false;
                     });
-                }, [safeTransactions, queryDate, reportMode]);
+                }, [safeTransactions, queryDate, reportMode,rangeEnd]);
 
                 const reportExp = useMemo(() => {
                     return safeExpenses.filter(e => {
-                        if (!e.date) return false;
+                        if (!e.date) return false;if(reportMode==='range')return SalonStore.day(e.date)>=queryDate&&SalonStore.day(e.date)<=rangeEnd;
                         if (reportMode === 'day') return e.date === queryDate;
                         if (reportMode === 'month') return e.date.startsWith(queryDate);
                         if (reportMode === 'year') return e.date.startsWith(queryDate);
                         return false;
                     });
-                }, [safeExpenses, queryDate, reportMode]);
+                }, [safeExpenses, queryDate, reportMode,rangeEnd]);
 
                 const totalRevenue = reportTx.reduce((sum, t) => sum + (Number(t.total) || 0), 0);
                 const totalExpense = reportExp.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -1616,21 +1614,21 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
                     reportTx.forEach(t => {
                         const method = t.paymentMethod || '其他';
                         if (!stats[method]) stats[method] = 0;
-                        stats[method] += t.total;
+                        stats[method] += Number(t.total)||0;
                     });
                     return stats;
                 }, [reportTx]);
 
 // 搜尋這行並替換整個 useMemo
-const salaryReport = useMemo(() => {
-    return safeStylists.map(s => {
-        let serviceRevenue = 0, productRevenue = 0, serviceCommission = 0, productCommission = 0;
+const calculatedSalary = useMemo(() => {
+    return SalonStore.all().stylists.filter(s=>!s.archived||reportTx.some(t=>(t.items||[]).some(i=>(String(i.stylistId)===String(s.id)||String(i.assistantId)===String(s.id))))).map(s => {
+        let serviceRevenue = 0, productRevenue = 0, serviceCommission = 0, productCommission = 0, assistantCommission=0;
         
         // 確保 reportTx 有資料才跑迴圈，避免 undefined 錯誤
         if (reportTx) {
             reportTx.forEach(t => {
-                (t.items || []).forEach(item => {
-                    if (item.stylistId === s.id) {
+                (t.items || []).forEach(item => {if(String(item.assistantId)===String(s.id))assistantCommission+=Number(item.assistantFee||0);
+                    if (String(item.stylistId) === String(s.id)) {
                         const amount = (Number(item.price) || 0) - (Number(item.discount) || 0);
                         let base = amount;
                         if (item.deductCost ?? safeSettings.deductCostBeforeCommission) {
@@ -1652,14 +1650,24 @@ const salaryReport = useMemo(() => {
         
         // 避免這裡產生 NaN
         const advanceTotal = (reportExp || []).filter(e => e.type === '員工借支' && String(e.staffId || e.relatedStaffId) === String(s.id)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        const totalSalary = (reportMode === 'month' ? (Number(s.baseSalary)||0) + (Number(s.positionBonus)||0) + (Number(s.attendanceBonus)||0) : 0) + serviceCommission + productCommission - advanceTotal;
-        return { ...s, serviceRevenue, productRevenue, totalCommission: serviceCommission+productCommission, advanceTotal, totalSalary };
+        const totalSalary = (reportMode === 'month' ? (Number(s.baseSalary)||0) + (Number(s.positionBonus)||0) + (Number(s.attendanceBonus)||0) : 0) + serviceCommission + productCommission + assistantCommission - advanceTotal;
+        return { ...s, serviceRevenue, productRevenue, totalCommission: serviceCommission+productCommission+assistantCommission, advanceTotal, totalSalary };
     });
-}, [reportTx, reportExp, safeStylists, safeSettings]);
+}, [reportTx, reportExp, safeStylists, safeSettings,reportMode]);
+const lockedSalary=reportMode==='month'?settings.payrollLocks?.[queryDate]:null;
+const salaryReport=lockedSalary?.rows||calculatedSalary;
+const categoryNames=[...new Set([...safeSettings.categories,...reportTx.flatMap(t=>(t.items||[]).map(i=>i.category||'未分類'))])];
+const expenseNames=[...new Set([...safeSettings.expenseTypes,...reportExp.map(e=>e.type||'未分類')])];
+const salesCost=reportTx.reduce((n,t)=>n+(t.items||[]).reduce((a,i)=>a+SalonStore.itemCost(i,Number(i.price)-Number(i.discount||0)),0),0);
+const grossProfit=totalRevenue-salesCost;
+const operatingExpense=reportExp.filter(e=>!e.inventoryPurchase&&!['進貨付款','員工借支','薪資發放'].includes(e.type)).reduce((n,e)=>n+Number(e.amount||0),0);
+const salaryCost=salaryReport.reduce((n,s)=>n+Number(s.totalSalary||0)+Number(s.advanceTotal||0),0);
+const lockPayroll=()=>confirmAction('鎖定本月薪資','保存目前薪資結果。後續更正訂單或設定不會自動改動這份結算，請先解鎖再核對。',async()=>{try{await setSettings(p=>({...p,payrollLocks:{...p.payrollLocks,[queryDate]:{at:new Date().toISOString(),rows:calculatedSalary}}}));showToast('本月薪資已鎖定');}catch{}});
+const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=[['日期','單號','顧客','付款方式','金額'],...reportTx.map(t=>[SalonStore.dateTime(t.date),t.id,t.customerName,t.paymentMethod,t.total])];const text='\ufeff'+rows.map(row=>row.map(v=>quote(typeof v==='string'&&/^[=+@-]/.test(v)?"'"+v:v)).join(',')).join('\r\n');const u=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='salon-report-'+queryDate+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
                 const categoryCountReport = useMemo(() => {
                     return safeStylists.map(s => {
                         const counts = {};
-                        safeSettings.categories.forEach(c => counts[c] = 0);
+                        categoryNames.forEach(c => counts[c] = 0);
                         let totalCount = 0;
                         reportTx.forEach(t => {
                             (t.items || []).forEach(i => {
@@ -1712,13 +1720,13 @@ const salaryReport = useMemo(() => {
                                     </button>
                                 ))}
                             </div>
-                            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                            <div className="flex flex-wrap items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
                                 <div className="flex gap-1 border-r pr-3 mr-2">
                                     <button onClick={()=>handleModeChange('day')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='day'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>日報</button>
                                     <button onClick={()=>handleModeChange('month')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='month'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>月報</button>
                                     <button onClick={()=>handleModeChange('year')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='year'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>年報</button>
                                 </div>
-                                <span className="text-slate-400 font-bold text-sm">查詢時間</span>
+                                <button className="btn btn-secondary text-xs" onClick={()=>handleModeChange('range')}>日期區間</button><button className="btn btn-secondary text-xs" onClick={exportReport}>匯出 CSV</button>{reportMode==='range'&&<div className="flex flex-wrap gap-2"><input aria-label="開始日期" type="date" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/><input aria-label="結束日期" type="date" min={queryDate} value={rangeEnd} onChange={e=>setRangeEnd(e.target.value)}/></div>}
                                 {reportMode === 'day' && <input type="date" className="bg-transparent font-bold text-slate-700 outline-none w-32" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
                                 {reportMode === 'month' && <input type="month" className="bg-transparent font-bold text-slate-700 outline-none" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
                                 {reportMode === 'year' && <input type="number" min="2020" max="2050" className="bg-transparent font-bold text-slate-700 outline-none w-20" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/>}
@@ -1728,16 +1736,16 @@ const salaryReport = useMemo(() => {
                         {view === 'dashboard' && (
                             <div className="space-y-8 animate-fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <StatCard title={`${reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}總營收`} value={formatCurrency(totalRevenue)} icon={TrendingUp} colorClass="border-indigo-500" />
-                                    <StatCard title={`${reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}總支出`} value={formatCurrency(totalExpense)} icon={Wallet} colorClass="border-rose-500" />
+                                    <StatCard title={'期間總營收'} value={formatCurrency(totalRevenue)} icon={TrendingUp} colorClass="border-indigo-500" />
+                                    <StatCard title={'現金支出登記'} value={formatCurrency(totalExpense)} icon={Wallet} colorClass="border-rose-500" />
                                     <StatCard title="收支結餘" value={formatCurrency(netProfit)} subValue={`結餘率: ${totalRevenue>0?((netProfit/totalRevenue)*100).toFixed(1):0}%`} icon={DollarSign} colorClass={netProfit>=0?"border-emerald-500":"border-red-500"} />
                                     <StatCard title="完成單數" value={totalOrders} subValue={`平均客單: ${formatCurrency(avgOrderValue)}`} icon={User} colorClass="border-amber-500" />
                                 </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div className="card p-6 space-y-3"><h3 className="font-bold text-lg">成本與損益試算</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div>銷貨／服務成本<strong className="block text-xl">{formatCurrency(salesCost)}</strong></div><div>毛利<strong className="block text-xl">{formatCurrency(grossProfit)}</strong></div><div>薪資{lockedSalary?'（已鎖定）':'（試算）'}<strong className="block text-xl">{formatCurrency(salaryCost)}</strong></div><div>{reportMode==='month'?'預估營業損益':'扣成本、費用與抽成後結餘'}<strong className="block text-xl">{formatCurrency(grossProfit-operatingExpense-salaryCost)}</strong></div></div><p className="text-sm text-slate-500">依訂單成本及已登記費用試算。進貨付款、借支及「薪資發放」不重複扣除；月報包含底薪津貼，其他區間尚未分攤底薪。未登記成本、費用不會自動補入。成本與自領料請依實際用途登記，避免重複。</p></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     <div className="card p-6">
                                         <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Scissors size={20} className="text-indigo-500"/> 服務項目營收佔比</h3>
                                         <div className="space-y-5">
-                                            {safeSettings.categories.map(cat => {
+                                            {categoryNames.map(cat => {
                                                 const catTotal = reportTx.reduce((sum, t) => sum + (t.items||[]).filter(i=>i.category===cat).reduce((s,i)=>s+(i.price-(i.discount||0)),0), 0);
                                                 const percent = totalRevenue > 0 ? (catTotal / totalRevenue) * 100 : 0;
                                                 if (percent === 0) return null;
@@ -1763,7 +1771,7 @@ const salaryReport = useMemo(() => {
                                     <div className="card p-6">
                                         <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Briefcase size={20} className="text-rose-500"/> 支出結構分析</h3>
                                         <div className="space-y-5">
-                                            {safeSettings.expenseTypes.map(type => {
+                                            {expenseNames.map(type => {
                                                 const typeTotal = reportExp.filter(e => e.type === type).reduce((sum, e) => sum + (Number(e.amount)||0), 0);
                                                 const percent = totalExpense > 0 ? (typeTotal / totalExpense) * 100 : 0;
                                                 if (typeTotal === 0) return null;
@@ -1779,7 +1787,7 @@ const salaryReport = useMemo(() => {
                         {view === 'salary' && (
                             <div className="space-y-8 animate-fade-in">
                                 <div className="card overflow-hidden">
-                                    <div className="p-4 border-b bg-slate-50 font-bold text-slate-700">薪資結算表 ({reportMode==='year'?'年度':reportMode==='month'?'月度':'當日'})</div>
+                                    <div className="p-4 flex flex-wrap gap-3">{reportMode==='month'&&(lockedSalary?<><span>已鎖定：{SalonStore.dateTime(lockedSalary.at)}</span><button className="btn btn-secondary" onClick={()=>confirmAction('解鎖薪資','解鎖後將依目前資料重新計算，確定？',async()=>{try{await setSettings(p=>{const locks={...p.payrollLocks};delete locks[queryDate];return {...p,payrollLocks:locks};});}catch{}})}>解鎖重新核對</button></>:<button className="btn btn-primary" onClick={lockPayroll}>確認並鎖定本月薪資</button>)}</div><div className="p-4 border-b bg-slate-50 font-bold text-slate-700">薪資結算表 ({reportMode==='year'?'年度':reportMode==='month'?'月度':'當日'})</div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
@@ -1813,10 +1821,10 @@ const salaryReport = useMemo(() => {
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                                                <tr><th className="p-4 sticky left-0 bg-white min-w-[120px]">設計師</th>{safeSettings.categories.map(c => <th key={c} className="p-4 text-center">{c}</th>)}<th className="p-4 text-center font-black bg-indigo-50/30">項目次數</th></tr>
+                                                <tr><th className="p-4 sticky left-0 bg-white min-w-[120px]">設計師</th>{categoryNames.map(c => <th key={c} className="p-4 text-center">{c}</th>)}<th className="p-4 text-center font-black bg-indigo-50/30">項目次數</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {categoryCountReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-bold text-slate-800 sticky left-0 bg-white border-r">{s.name}</td>{safeSettings.categories.map(c => (<td key={c} className="p-4 text-center text-slate-600">{s.counts[c] > 0 ? <span className="bg-slate-100 px-2 py-1 rounded font-bold">{s.counts[c]}</span> : '-'}</td>))}<td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30">{s.totalCount}</td></tr>))}
+                                                {categoryCountReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-bold text-slate-800 sticky left-0 bg-white border-r">{s.name}</td>{categoryNames.map(c => (<td key={c} className="p-4 text-center text-slate-600">{s.counts[c] > 0 ? <span className="bg-slate-100 px-2 py-1 rounded font-bold">{s.counts[c]}</span> : '-'}</td>))}<td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30">{s.totalCount}</td></tr>))}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1839,7 +1847,7 @@ const salaryReport = useMemo(() => {
                                                     <td className="p-4 font-bold text-slate-700"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${e.type==='員工借支'?'bg-rose-100 text-rose-700':'bg-slate-100 text-slate-700'}`}>{e.type==='員工借支' && <Wallet size={12}/>} {e.type}</span></td>
                                                     <td className="p-4 text-slate-600">{e.note} {(e.staffId||e.relatedStaffId) && <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-xs font-bold ml-1">{safeStylists.find(s=>String(s.id)===String(e.staffId||e.relatedStaffId))?.name}</span>}</td>
                                                     <td className="p-4 text-right font-bold text-rose-600">{formatCurrency(e.amount)}</td>
-                                                    <td className="p-4 text-center"><button onClick={()=>confirmAction('刪除支出', '確定刪除此筆紀錄？', ()=>setExpenses(safeExpenses.filter(x=>x.id!==e.id)))} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><Trash2 size={16}/></button></td>
+                                                    <td className="p-4 text-center"><button onClick={()=>confirmAction('作廢支出', '保留紀錄並從支出計算排除，確定？', ()=>setExpenses(safeExpenses.filter(x=>x.id!==e.id)))} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><Trash2 size={16}/></button></td>
                                                 </tr>
                                             ))}
                                             {reportExp.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-400">尚無支出紀錄</td></tr>}
@@ -1872,7 +1880,7 @@ const {safeTransactions,showToast,confirmAction,transactions,setTransactions,cus
                 const [dateMode, setDateMode] = useState('month');
                 const [queryDate, setQueryDate] = useState(getCurrentDateLocal().slice(0, 7));
                 const [editingOrder, setEditingOrder] = useState(null);
-                const [filterStylist, setFilterStylist] = useState('all');
+                const [filterStylist, setFilterStylist] = useState('all');const [visibleCount,setVisibleCount]=useState(60);
 
                const handleModeChange = (mode) => {
     setDateMode(mode);
@@ -1898,13 +1906,13 @@ const {safeTransactions,showToast,confirmAction,transactions,setTransactions,cus
                         const matchSearch = searchTerm ? ((t.customerName && t.customerName.includes(searchTerm)) || (t.id && t.id.includes(searchTerm))) : true;
                         const matchStylist = filterStylist === 'all' || t.mainStylistId === filterStylist;
 
-                        return matchDate && matchSearch && matchStylist;
+                        return !t.voided && matchDate && matchSearch && matchStylist;
                     }).sort((a,b) => new Date(b.date) - new Date(a.date));
                 }, [safeTransactions, queryDate, searchTerm, dateMode, filterStylist]);
 
                         const handleDeleteOrder = orderId => {
  const order=safeTransactions.find(t=>t.id===orderId);if(!order)return;
- confirmAction('刪除訂單','刪除後會回補商品庫存並扣回會員累計，確定繼續？',async()=>{try{await SalonStore.reviseOrder({...order,expectedVersion:JSON.stringify(order)},true);showToast('訂單已刪除，庫存與會員累計已同步');}catch(e){showToast(e.message,'error');}});
+ const reason=prompt('請填寫作廢原因（此操作會回補庫存、扣回會員累計；款項請另行退還）');if(!reason?.trim())return;confirmAction('作廢訂單','保留原單及原因，確認作廢？',async()=>{try{await SalonStore.reviseOrder({...order,voidReason:reason.trim(),expectedVersion:JSON.stringify(order)},true);showToast('訂單已作廢，庫存與會員累計已同步');}catch(e){showToast(e.message,'error');}});
 };
 const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrder(updatedOrder);setEditingOrder(null);showToast('訂單與庫存、會員累計已更新');}catch(e){showToast(e.message,'error');}};
 
@@ -1930,7 +1938,7 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
 
                         {/* 卡片式列表區域 */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                         {filteredOrders.map(t => {
+                         {filteredOrders.slice(0,visibleCount).map(t => {
 
                         const customer = safeCustomers.find(c => c.id === t.customerId);
                         // 優先讀取訂單上記錄的散客性別(customerGender)，如果找不到(代表舊會員訂單)，再去找會員資料夾裡的性別(gender)
@@ -1988,7 +1996,7 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                                         {/* 懸浮按鈕 */}
                                         <div className="absolute top-4 right-4 flex gap-2 bg-white/90 p-1.5 rounded-lg shadow-sm backdrop-blur-sm border border-slate-100">
                                         <button onClick={()=>setEditingOrder(t)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="編輯"><Edit size={16}/></button>
-                                            <button onClick={()=>handleDeleteOrder(t.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="刪除"><Trash2 size={16}/></button>
+                                            <button onClick={()=>handleDeleteOrder(t.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="作廢訂單"><Trash2 size={16}/></button>
                                         </div>
                                     </div>
                                 );
@@ -2002,22 +2010,33 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                             </div>
                         )}
 
-                        {editingOrder && <EditOrderModal order={editingOrder} onClose={()=>setEditingOrder(null)} onSave={handleUpdateOrder}/>}
+                        <button className="btn btn-secondary my-3" hidden={visibleCount>=filteredOrders.length} onClick={()=>setVisibleCount(n=>n+60)}>載入更多訂單（共 {filteredOrders.length} 筆）</button><details className="card p-4 my-4"><summary>查看作廢單據</summary>{safeTransactions.filter(t=>t.voided).slice(0,visibleCount).map(t=><div key={t.id} className="p-3 border-b">{SalonStore.dateTime(t.date)} · {t.customerName} · {formatCurrency(t.total)}<p>原因：{t.voidReason} · 作廢時間：{SalonStore.dateTime(t.voidedAt)}</p></div>)}</details>{editingOrder && <EditOrderModal order={editingOrder} onClose={()=>setEditingOrder(null)} onSave={handleUpdateOrder}/>}
                     </div>
                 );
             };
 
 function AppearanceSettings(){
  const {settings,setSettings,safeSettings,showToast}=React.useContext(SalonContext);
- const update=(key,value)=>setSettings(prev=>({...prev,appearance:{...prev.appearance,[key]:value}}));
- return <div className="card p-6 space-y-5"><h3 className="font-bold text-xl">外觀與操作設定</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- <label>整體風格<select className="input-field" value={settings.appearance?.theme||'pearl'} onChange={e=>update('theme',e.target.value)}><option value="pearl">珍珠白</option><option value="glass">柔霧玻璃</option><option value="candy">柔和彩色</option></select></label>
- <label>文字大小<select className="input-field" value={settings.appearance?.textSize||'standard'} onChange={e=>update('textSize',e.target.value)}><option value="standard">標準</option><option value="large">大字</option><option value="extra">特大字</option></select></label>
- <label>版面間距<select className="input-field" value={settings.appearance?.density||'comfortable'} onChange={e=>update('density',e.target.value)}><option value="comfortable">寬鬆好按</option><option value="compact">精簡</option></select></label>
- <label className="flex gap-3 items-center"><input type="checkbox" checked={settings.appearance?.motion!==false} onChange={e=>update('motion',e.target.checked)}/>啟用輕微過渡動畫</label></div>
- <div><h4 className="font-bold mb-3">服務與商品分類顏色</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{safeSettings.categories.map(cat=><div key={cat} className="border rounded-xl p-3"><div className="font-bold mb-2">{cat}</div><div className="flex flex-wrap gap-2">{Object.entries(COLOR_THEMES).map(([key,color])=><button key={key} aria-label={cat+' '+color.label} title={color.label} className={'color-swatch '+(safeSettings.categoryColors[cat]===key?'selected':'')} style={{background:color.fill}} onClick={()=>setSettings(prev=>({...prev,categoryColors:{...prev.categoryColors,[cat]:key}}))}/>)}</div></div>)}</div></div></div>;
+ const [open,setOpen]=useState(false),[draft,setDraft]=useState({}),[colors,setColors]=useState({}),[editingCat,setEditingCat]=useState(''),[busy,setBusy]=useState(false),[payments,setPayments]=useState('');
+ const panel=React.useRef(null),trigger=React.useRef(null);
+ const presets=[['slate','霧白石墨','#526675','#eef2f4'],['warm','暖米茶棕','#806451','#f4eee6'],['blue','霧藍灰','#4e7088','#e8eff4'],['sage','鼠尾草綠','#577667','#eaf0e9']];
+ const defaults={theme:'glass',palette:'slate',accent:'#526675',shape:'soft',textSize:'standard',weight:'normal',density:'comfortable',columns:3,effect:'light',motion:false};
+ const launch=()=>{setDraft({...defaults,...settings.appearance});setColors({...safeSettings.categoryColors});setPayments((settings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).join('、'));setEditingCat('');setOpen(true);};
+ useEffect(()=>{if(!open)return;const before=document.activeElement;panel.current?.focus();const onKey=e=>{if(e.key==='Escape'&&!busy)setOpen(false);if(e.key==='Tab'){const nodes=[...panel.current.querySelectorAll('button,input,select,summary,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===panel.current)){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener('keydown',onKey);return()=>{document.removeEventListener('keydown',onKey);before?.focus();};},[open,busy]);
+ const change=(key,value)=>setDraft(p=>({...p,[key]:value}));
+ const apply=async()=>{if(busy)return;const methods=[...new Set(payments.split(/[、,，\n]/).map(x=>x.trim()).filter(Boolean))];if(!methods.length){showToast('請至少保留一種付款方式','error');return;}setBusy(true);try{await setSettings(p=>({...p,appearance:draft,categoryColors:colors,paymentMethods:methods}));setOpen(false);showToast('外觀與操作設定已套用');}catch{}finally{setBusy(false);}};
+ return <><div className="card appearance-intro p-6"><div><span className="eyebrow">YOUR SALON · YOUR STYLE</span><h3 className="font-bold text-xl mt-2">外觀與操作設定</h3><p className="text-sm text-slate-500 mt-2">柔霧層次、清楚標籤，讓每一次開單都順手。</p></div><div className="appearance-sample" aria-hidden="true"><span>剪髮</span><span>護髮</span><strong>專屬你的工作空間</strong></div><button ref={trigger} className="btn btn-primary" onClick={launch}>調整風格與版面</button></div>
+ {open&&<div className="style-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setOpen(false);}}><section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="style-title" className="style-drawer"><header className="style-header"><div><span className="eyebrow">APPEARANCE</span><h2 id="style-title" className="text-xl font-bold">打造你的工作空間</h2></div><button aria-label="關閉外觀設定" className="btn btn-secondary" disabled={busy} onClick={()=>setOpen(false)}><X size={20}/></button></header><div className="style-body space-y-6">
+ <div className="style-preview" style={{background:presets.find(p=>p[0]===draft.palette)?.[3]||'#eef2f4',borderRadius:draft.shape==='square'?8:draft.shape==='pill'?28:18,fontSize:draft.textSize==='extra'?20:draft.textSize==='large'?18:16}}><span className="eyebrow">即時預覽</span><div className="flex gap-2 my-3"><span style={{background:(COLOR_THEMES[colors[safeSettings.categories[0]]]||COLOR_THEMES.slate).fill+'20',color:'#334155'}} className="preview-tag">{safeSettings.categories[0]||'剪髮'}</span><span className="preview-tag">護髮</span></div><div className="preview-service"><div><strong>精緻剪髮</strong><p className="text-sm text-slate-500">讓重要資訊一眼清楚</p></div><strong>$600</strong></div><button disabled className="preview-pay" style={{background:draft.accent,borderRadius:draft.shape==='square'?6:draft.shape==='pill'?28:12}}>確認收款</button></div>
+ <div><h3 className="font-bold mb-3">選一套喜歡的配色</h3><div className="theme-options">{presets.map(([key,name,accent,bg])=><button key={key} aria-pressed={draft.palette===key} className={'theme-option '+(draft.palette===key?'selected':'')} onClick={()=>setDraft(p=>({...p,palette:key,accent,theme:'glass'}))}><div className="mini-scene" style={{background:bg}}><i style={{background:accent}}/><div><b/><b/></div></div><span>{name}</span>{draft.palette===key&&<span aria-hidden="true"> ✓</span>}</button>)}</div></div>
+ <div className="grid grid-cols-2 gap-4"><label>文字大小<select className="input-field mt-2" value={draft.textSize} onChange={e=>change('textSize',e.target.value)}><option value="standard">標準</option><option value="large">大字</option><option value="extra">特大字</option></select></label><label>形狀<select className="input-field mt-2" value={draft.shape} onChange={e=>change('shape',e.target.value)}><option value="soft">柔和圓角</option><option value="pill">圓潤膠囊</option><option value="square">俐落小圓角</option></select></label><label>操作間距<select className="input-field mt-2" value={draft.density} onChange={e=>change('density',e.target.value)}><option value="comfortable">寬鬆好按</option><option value="compact">精簡</option></select></label><label>平板項目欄數<select className="input-field mt-2" value={draft.columns} onChange={e=>change('columns',Number(e.target.value))}>{[2,3,4].map(n=><option key={n} value={n}>{n} 欄</option>)}</select></label></div>
+ <details className="style-disclosure"><summary>分類標籤配色 <span>點開後逐項調整</span></summary><div className="mt-3 space-y-2">{safeSettings.categories.map(cat=><div key={cat} className="category-setting"><button className="category-setting-row" onClick={()=>setEditingCat(editingCat===cat?'':cat)} aria-expanded={editingCat===cat}><span className="preview-tag" style={{background:(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).fill+'20'}}>{cat}</span><span className="text-sm text-slate-500">{(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).label} · 編輯</span></button>{editingCat===cat&&<div className="color-options">{Object.entries(COLOR_THEMES).map(([key,c])=><button key={key} aria-pressed={colors[cat]===key} onClick={()=>setColors(p=>({...p,[cat]:key}))}><span style={{background:c.fill+'22',borderColor:c.fill,color:'#334155'}}>{cat}</span><small>{c.label}{colors[cat]===key?' ✓':''}</small></button>)}</div>}</div>)}</div></details>
+ <details className="style-disclosure"><summary>進階外觀與付款設定</summary><div className="grid grid-cols-2 gap-4 mt-4"><label>材質<select className="input-field mt-2" value={draft.theme} onChange={e=>change('theme',e.target.value)}><option value="glass">柔霧玻璃</option><option value="pearl">純淨白</option><option value="candy">柔和彩色</option></select></label><label>字體粗細<select className="input-field mt-2" value={draft.weight} onChange={e=>change('weight',e.target.value)}><option value="normal">標準</option><option value="bold">加強清晰</option></select></label><label>主色<input aria-label="自訂主色" type="color" className="input-field mt-2" value={draft.accent} onChange={e=>change('accent',e.target.value)}/></label><label>玻璃效果<select className="input-field mt-2" value={draft.effect} onChange={e=>change('effect',e.target.value)}><option value="light">輕量霧面（較順暢）</option><option value="blur">半透明模糊</option></select></label><label className="col-span-2 flex gap-2"><input type="checkbox" checked={draft.motion} onChange={e=>change('motion',e.target.checked)}/>啟用輕微過渡動畫</label><label className="col-span-2">付款方式（以「、」分隔，依輸入順序排列）<input className="input-field mt-2" value={payments} onChange={e=>setPayments(e.target.value)}/></label><button className="btn btn-secondary col-span-2" onClick={()=>{setDraft({...defaults});setColors({});}}>恢復預設外觀（套用後生效）</button></div></details>
+ </div><footer className="style-footer"><button className="btn btn-secondary" disabled={busy} onClick={()=>setOpen(false)}>取消</button><button className="btn btn-primary flex-1" disabled={busy} onClick={apply}>{busy?'儲存中…':'套用風格與設定'}</button></footer></section></div>}</>;
 }
+function ArchiveSettings(){const {settings,setSettings,showToast}=React.useContext(SalonContext);const [version,setVersion]=useState(0);const [fee,setFee]=useState(settings.assistantFee||0);const records=SalonStore.all();return <details className="card p-5"><summary className="font-bold cursor-pointer">進階管理 · 封存資料與助理計酬</summary><div className="space-y-4 mt-4"><label className="block">每項服務的助理費（元，0 表示不計；只影響新單）<input type="number" className="input-field mt-2" min="0" value={fee} onChange={e=>setFee(e.target.value)}/></label><button className="btn btn-secondary" onClick={async()=>{try{const n=SalonStore.money(fee);await setSettings(p=>({...p,assistantFee:n}));showToast('助理費已儲存');}catch(e){showToast(e.message,'error');}}}>儲存助理費</button><p className="text-sm text-slate-500">助理費另外列入人員薪資，不從主設計師抽成扣除。商品不計助理服務費。</p>{[['services','服務／商品'],['customers','顧客'],['stylists','人員'],['expenses','支出']].map(([key,label])=><details key={key}><summary>{label}封存紀錄（{records[key].filter(x=>x.archived).length}）</summary>{records[key].filter(x=>x.archived).slice(0,100).map(x=><div key={x.id} className="flex items-center justify-between border-b p-2 gap-3"><span>{x.name||x.Name||x.type} {x.date||''} {x.amount||''}</span><button className="btn btn-secondary text-sm" onClick={async()=>{try{await SalonStore.set(SalonStore.DATA[key],prev=>prev.map(r=>r.id===x.id?{...r,archived:false}:r));setVersion(n=>n+1);showToast('已恢復');}catch(e){showToast(e.message,'error');}}}>恢復</button></div>)}</details>)}</div></details>;}
 function downloadJSON(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function RecoveryFailure(){return <div className="p-6 space-y-4"><h1>資料復原尚未完成，請保留本機資料</h1><button className="btn btn-primary" onClick={()=>downloadJSON(Object.fromEntries([...Object.values(SalonStore.DATA),SalonStore.DRAFT,window.AetherPosBridge.PREFIX+'journal'].map(k=>[k,localStorage.getItem(k)])),'salon_raw_recovery.json')}>下載原始資料供修復</button></div>;}
 class PosErrorBoundary extends React.Component {constructor(props){super(props);this.state={error:null};}static getDerivedStateFromError(error){return {error};}render(){if(this.state.error)return <div className="p-6 max-w-lg mx-auto space-y-4"><h1 className="text-xl font-bold">資料讀取需要修復</h1><p>原資料仍保留，請先下載原始資料，再聯絡管理者；不要重置系統。</p><button className="btn btn-primary" onClick={()=>downloadJSON(Object.fromEntries([...Object.values(SalonStore.DATA),SalonStore.DRAFT,window.AetherPosBridge.PREFIX+'journal'].map(k=>[k,localStorage.getItem(k)])),'salon_raw_recovery.json')}>下載原始資料</button></div>;return this.props.children;}}
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        if(navigator.locks)navigator.locks.request('salon_transactions-write',()=>window.AetherPosBridge.recover()).then(()=>root.render(<PosErrorBoundary><HairSalonApp /></PosErrorBoundary>)).catch(()=>{document.getElementById('root').textContent='資料復原未完成，請保留本機資料並聯絡支援。';});else if(localStorage.getItem(window.AetherPosBridge.PREFIX+'journal'))document.getElementById('root').textContent='請使用支援安全寫入的瀏覽器復原資料。';else root.render(<PosErrorBoundary><HairSalonApp /></PosErrorBoundary>);
+        if(navigator.locks)navigator.locks.request('salon_transactions-write',()=>window.AetherPosBridge.recover()).then(()=>root.render(<PosErrorBoundary><HairSalonApp /></PosErrorBoundary>)).catch(()=>{root.render(<RecoveryFailure/>);});else if(localStorage.getItem(window.AetherPosBridge.PREFIX+'journal'))root.render(<RecoveryFailure/>);else root.render(<PosErrorBoundary><HairSalonApp /></PosErrorBoundary>);
