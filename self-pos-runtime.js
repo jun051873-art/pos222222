@@ -91,7 +91,7 @@ async function restore(data){validateBackup(data);return transaction(()=>{
  // Restoring another device's preferences must not enable uploads from this device.
  const downloaded=downloadVersions.get(data);
  after[DATA.settings]={...after[DATA.settings],...(downloaded?.settings||{}),autoCloudBackup:false};
- if(downloaded)after[cloudMetaKey(downloaded.settings)]={at:new Date().toISOString(),updateTime:downloaded.updateTime,confirmed:true};
+ if(downloaded)after[cloudMetaKey(downloaded.settings)]={at:new Date().toISOString(),updateTime:downloaded.updateTime,confirmed:true,versionId:downloaded.versionId};
  atomic(after);
  }).catch(e=>{if(e.name==='QuotaExceededError')throw Error('手機／瀏覽器本機儲存空間不足，還原未完成；請先下載本機備份，不要重置或清除網站資料。');throw e;});}
 const cloudSubscribe=f=>subscribe(PREFIX+'cloud',f);
@@ -130,27 +130,62 @@ async function packCloud(payload){
  if(JSON.stringify(await unpackCloud(content))!==text)throw Error('備份壓縮驗證失敗，未上傳雲端');
  return {content,rawBytes:bytes.length,storedBytes};
 }
+// Version documents are create-only. Never PATCH or DELETE the legacy document.
+async function cloudVersions(settings){
+ const base=cloudURL(settings),result=[];let token='';const seen=new Set();
+ do{const r=await cloudFetch(base+'/Backups?pageSize=100&mask.fieldPaths=parentVersion&mask.fieldPaths=kind'+(token?'&pageToken='+encodeURIComponent(token):''),{cache:'no-store'});
+ if(r.status===403)throw Error('雲端版本備份權限尚未開通，已停止操作；不會改用覆蓋舊備份。請管理者設定 Backups 的讀取與新增權限');
+ const page=await responseJSON(r);if(!Array.isArray(page.documents)&&page.documents!==undefined)throw Error('版本清單格式異常，已停止操作');
+ for(const doc of page.documents||[]){if(!doc.name||!doc.createTime||!doc.updateTime)throw Error('版本清單缺少時間，已停止操作');result.push({...doc,versionId:doc.name.split('/').pop()});}
+ token=page.nextPageToken||'';if(token&&seen.has(token))throw Error('版本清單讀取不完整，已停止操作');seen.add(token);
+ }while(token);
+ return result.sort((a,b)=>b.createTime.localeCompare(a.createTime)||b.name.localeCompare(a.name));
+}
+async function cloudHead(settings){
+ const base=cloudURL(settings),r=await cloudFetch(base,{cache:'no-store'});const legacy=r.status===404?null:await responseJSON(r);
+ const versions=await cloudVersions(settings),latest=versions.find(v=>v.fields?.kind?.stringValue!=='legacy-snapshot');
+ // Older application versions can still write the legacy record until backend rules are locked.
+ if(legacy&&latest&&legacy.updateTime>latest.createTime)throw Error('偵測到舊版裝置更新原始備份，已停止操作。所有版本仍保留，請先核對後台資料');
+ if(!latest)return {document:legacy,versionId:'legacy',versions};
+ const document=await responseJSON(await cloudFetch(base+'/Backups/'+encodeURIComponent(latest.versionId),{cache:'no-store'}));
+ if(document.updateTime!==latest.updateTime)throw Error('備份版本在讀取時發生變更，已停止操作');
+ return {document,versionId:latest.versionId,versions};
+}
 async function cloudBackup(settings,manual=false){if(cloudBusy)throw Error('雲端備份處理中，請稍候');clearTimeout(cloudTimer);const startRevision=revision;cloudBusy=true;status('saving','雲端備份中，本機可繼續開單');try{
  const url=cloudURL(settings),metaKey=cloudMetaKey(settings);const meta=read(metaKey,{});
  if(!manual&&(!meta.updateTime||meta.confirmed===false))throw Error('請先手動完成一次雲端備份，再開啟自動備份');
- const r=await cloudFetch(url);let current=null;if(r.status!==404)current=await responseJSON(r);
+ const head=await cloudHead(settings),current=head.document;
  if(current&&meta.updateTime&&current.updateTime!==meta.updateTime)throw Error('雲端已被其他裝置更新，請先核對，未覆蓋備份');
  if(!manual&&current&&!meta.updateTime)throw Error('請先核對既有雲端資料');
  const payload=backupPayload();payload.settings={...payload.settings,...settings};if(current)protectCloud(payload,await unpackCloud(current.fields?.content?.stringValue));const {content,rawBytes,storedBytes}=await packCloud(payload);
- const precondition=current?'&currentDocument.updateTime='+encodeURIComponent(current.updateTime):'&currentDocument.exists=false';
- const saved=await responseJSON(await cloudFetch(url+'?updateMask.fieldPaths=content'+precondition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{content:{stringValue:content}}})}));
+ // Preserve an exact copy of the original record as well; it is never used as a new upload head.
+ if(current&&head.versionId==='legacy'&&!head.versions.some(v=>v.versionId==='legacy-original')){
+ const archiveURL=url+'/Backups/legacy-original';const archiveFields={...current.fields,kind:{stringValue:'legacy-snapshot'}};
+ const archiveResponse=await cloudFetch(archiveURL+'?currentDocument.exists=false',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:archiveFields})});
+ if(!archiveResponse.ok&&archiveResponse.status!==409)await responseJSON(archiveResponse);
+ const archived=await responseJSON(await cloudFetch(archiveURL,{cache:'no-store'}));
+ if(archived.fields?.content?.stringValue!==current.fields?.content?.stringValue)throw Error('原始備份保留副本與目前內容不同，已停止新增；既有資料未覆寫');
+ }
+ const versionId=id(),versionURL=url+'/Backups/'+encodeURIComponent(versionId);const precondition='&currentDocument.exists=false';
+ const saved=await responseJSON(await cloudFetch(versionURL+'?updateMask.fieldPaths=content&updateMask.fieldPaths=parentVersion'+precondition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{content:{stringValue:content},parentVersion:{stringValue:current?head.versionId+':'+current.updateTime:'none'}}})}));
  if(saved.fields?.content?.stringValue!==content)throw Error('雲端回傳內容不符，尚未確認備份成功');
  // Keep the write receipt if the verification GET fails, so a manual retry can
  // safely compare against our own write without disabling conflict detection.
  if(!saved.updateTime)throw Error('雲端未提供備份版本，尚未確認成功');
- localStorage.setItem(metaKey,JSON.stringify({updateTime:saved.updateTime,confirmed:false}));
- const checked=await responseJSON(await cloudFetch(url,{cache:'no-store'}));if(checked.updateTime!==saved.updateTime||checked.fields?.content?.stringValue!==content)throw Error('上傳後的雲端讀回核對不符，請核對其他裝置，尚未確認備份成功');await unpackCloud(checked.fields.content.stringValue);
- const at=new Date().toISOString();localStorage.setItem(metaKey,JSON.stringify({at,updateTime:saved.updateTime}));const sizeInfo=rawBytes>storedBytes?'（'+Math.ceil(rawBytes/1024)+' → '+Math.ceil(storedBytes/1024)+' KB）':'';status('saved','雲端備份成功'+sizeInfo+' · '+dateTime(at).replace('T',' '),{at,rawBytes,storedBytes});return saved;
+ localStorage.setItem(metaKey,JSON.stringify({updateTime:saved.updateTime,versionId,confirmed:false}));
+ const checked=await responseJSON(await cloudFetch(versionURL,{cache:'no-store'}));if(checked.updateTime!==saved.updateTime||checked.fields?.content?.stringValue!==content)throw Error('上傳後的雲端讀回核對不符，請核對其他裝置，尚未確認備份成功');await unpackCloud(checked.fields.content.stringValue);
+ const at=new Date().toISOString();localStorage.setItem(metaKey,JSON.stringify({at,updateTime:saved.updateTime,versionId,confirmed:true}));const sizeInfo=rawBytes>storedBytes?'（'+Math.ceil(rawBytes/1024)+' → '+Math.ceil(storedBytes/1024)+' KB）':'';status('saved','雲端新版本已保存，舊版本保留'+sizeInfo+' · '+dateTime(at).replace('T',' '),{at,rawBytes,storedBytes});return saved;
  }catch(e){status('error',e.message);throw e;}finally{cloudBusy=false;if(revision!==startRevision&&read(DATA.settings,{}).autoCloudBackup)scheduleCloud();}}
-async function cloudDownload(settings){const document=await responseJSON(await cloudFetch(cloudURL(settings),{cache:'no-store'}));const data=await unpackCloud(document.fields?.content?.stringValue);if(!document.updateTime)throw Error('雲端未提供版本，請稍後再試');downloadVersions.set(data,{settings:{shopID:settings.shopID.trim(),syncToken:settings.syncToken.trim()},updateTime:document.updateTime});return data;}
+async function cloudDownload(settings,versionId){
+ const head=await cloudHead(settings);let document=head.document,selected=head.versionId;
+ if(versionId&&versionId!==head.versionId){if(versionId==='legacy'){const r=await cloudFetch(cloudURL(settings),{cache:'no-store'});document=await responseJSON(r);}else{if(!head.versions.some(v=>v.versionId===versionId))throw Error('找不到指定備份版本');document=await responseJSON(await cloudFetch(cloudURL(settings)+'/Backups/'+encodeURIComponent(versionId),{cache:'no-store'}));}selected=versionId;}
+ if(!document)throw Error('尚無雲端備份，未變更本機資料');const data=await unpackCloud(document.fields?.content?.stringValue);if(!document.updateTime)throw Error('雲端未提供版本，請稍後再試');
+ downloadVersions.set(data,{settings:{shopID:settings.shopID.trim(),syncToken:settings.syncToken.trim()},updateTime:document.updateTime,versionId:selected});return data;
+}
+
 function scheduleCloud(){clearTimeout(cloudTimer);const settings=read(DATA.settings,{});if(!settings.autoCloudBackup){status('pending','資料已存本機；雲端需手動備份');return;}status('pending','資料已存本機，等待背景備份');cloudTimer=setTimeout(()=>cloudBackup(read(DATA.settings,{})).catch(()=>{}),4000);}
 root.addEventListener?.('storage',e=>{if(e.key){cache.delete(e.key);emit(e.key);}else for(const key of listeners.keys()){cache.delete(key);emit(key);}});
 root.addEventListener?.('salon-local-update',e=>{cache.delete(e.key);emit(e.key);});
 root.addEventListener?.('online',()=>{if(read(DATA.settings,{}).autoCloudBackup)scheduleCloud();});
-Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudSubscribe,cloudSnapshot:()=>cloudState}});
+Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudVersions,cloudSubscribe,cloudSnapshot:()=>cloudState}});
 })(window);

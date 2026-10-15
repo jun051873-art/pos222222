@@ -295,7 +295,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1005.0</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1005.1</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
@@ -463,9 +463,9 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
     };
 
     // --- 修正：重新命名專屬函式，防止與全域 syncToCloud 衝突導致客資開單凍結 ---
-    const [cloudWorking,setCloudWorking]=useState(false);
+    const [cloudWorking,setCloudWorking]=useState(false);const [backupVersions,setBackupVersions]=useState(null);const [selectedBackup,setSelectedBackup]=useState('');const listBackups=async()=>{if(cloudWorking)return;setCloudWorking(true);try{setBackupVersions(await SalonStore.cloudVersions({shopID:localShopID.trim(),syncToken:localSyncToken.trim()}));}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
     const handleSettingsBackup=async()=>{if(cloudWorking)return;setCloudWorking(true);try{await saveCloudSettings();await SalonStore.cloudBackup({...safeSettings,shopID:localShopID.trim(),syncToken:localSyncToken.trim()},true);showToast('雲端備份已確認成功');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
-    const handleSettingsRestore=async()=>{if(cloudWorking)return;setCloudWorking(true);try{const data=await SalonStore.cloudDownload({shopID:localShopID.trim(),syncToken:localSyncToken.trim()});if(!confirm('雲端備份：'+(data.lastUpdated?SalonStore.dateTime(data.lastUpdated):'日期未提供')+'\n訂單 '+data.transactions.length+' 筆／顧客 '+data.customers.length+' 位\n確定還原？會先保留目前資料的還原前副本。'))return;await SalonStore.restore(data);showToast('還原完成；此裝置的自動備份保持關閉');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
+    const handleSettingsRestore=async()=>{if(cloudWorking)return;setCloudWorking(true);try{const data=await SalonStore.cloudDownload({shopID:localShopID.trim(),syncToken:localSyncToken.trim()},selectedBackup||undefined);if(!confirm('雲端備份：'+(data.lastUpdated?SalonStore.dateTime(data.lastUpdated):'日期未提供')+'\n訂單 '+data.transactions.length+' 筆／顧客 '+data.customers.length+' 位\n確定還原？會先保留目前資料的還原前副本。'))return;await SalonStore.restore(data);showToast('還原完成；此裝置的自動備份保持關閉');}catch(e){showToast(e.message,'error');}finally{setCloudWorking(false);}};
 
     const _addCategory = () => { if(categoryInput.trim() && !safeSettings.categories.includes(categoryInput.trim())) { setSettings(prev=>({...prev, categories: [...safeSettings.categories, categoryInput.trim()]})); setCategoryInput(''); } };
     const _addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings(prev=>({...prev, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]})); setExpenseTypeInput(''); } };
@@ -526,7 +526,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 </div>
                 <div className="flex gap-4">
                     <button onClick={async()=>{try{await saveCloudSettings();showToast("連線設定已儲存，尚未傳送資料", "success");}catch(e){showToast("設定未儲存，請重新核對", "error");}}} className="btn btn-secondary">儲存連線設定</button><button disabled={cloudWorking} onClick={handleSettingsBackup} className="btn btn-primary flex-1 py-4 font-bold shadow-lg text-lg">
-                        <Upload size={20}/> 上傳本機資料到雲端
+                        <Upload size={20}/> 新增雲端備份版本
                     </button>
                     <button disabled={cloudWorking} onClick={handleSettingsRestore} className="btn btn-secondary flex-1 py-4 font-bold text-lg">
                         <Download size={20}/> 從雲端還原到此裝置
@@ -535,7 +535,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
             </div>
 
             <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,autoCloudBackup:checked}));}}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份。防誤覆蓋已啟用：訂單、顧客、支出、庫存紀錄、服務商品及人員，筆數少於雲端或缺少原有資料時，禁止上傳。封存與作廢會保留原始識別碼，不會因筆數減少而阻擋備份；掛單與草稿不比較筆數。</p></div>
-            <AppearanceSettings/><ArchiveSettings/>
+            <details className="card p-5"><summary className="font-bold">雲端歷史備份 · 每次新增，保留舊版</summary><p className="text-sm text-slate-500 my-3">新版不會覆寫或刪除原始備份。還原歷史版本只改變此裝置，且會關閉自動備份。請所有裝置更新到 1005.1；後台仍須限制舊版寫入。</p><button className="btn btn-secondary" disabled={cloudWorking} onClick={listBackups}>讀取雲端版本清單</button>{backupVersions&&<label className="block mt-3">還原來源<select className="input-field mt-2" value={selectedBackup} onChange={e=>setSelectedBackup(e.target.value)}><option value="">最新版本（預設）</option><option value="legacy">原始舊備份（保留）</option>{backupVersions.map(v=><option key={v.versionId} value={v.versionId}>{SalonStore.dateTime(v.createTime)} · {v.versionId.slice(0,8)}</option>)}</select><p className="text-sm mt-2">選好後使用上方「從雲端還原到此裝置」。會先保留本機還原前副本。</p></label>}</details><AppearanceSettings/><ArchiveSettings/>
             {/* 營業項目管理列表 */}
             <div className="card p-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
