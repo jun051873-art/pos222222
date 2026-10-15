@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /SalonPOS/{shop} {
+      allow read: if true;
+      match /Tokens/{token} {
+        allow get: if true;
+        allow list, create, update, delete: if false;
+        match /Backups/{version} {
+          allow read: if true;
+          allow create: if request.resource.data.content is string
+            && request.resource.data.content.size() <= 1000000;
+          allow update, delete: if false;
+        }
+      }
+      match /{collection}/{document=**} {
+        allow read, write: if collection != 'Tokens';
+      }
+    }
+  }
+}

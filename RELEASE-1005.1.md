@@ -16,5 +16,8 @@ Backups 無讀取或新增權限時停止操作，絕不回退到原始文件覆
 - 必須檢查重疊／遞迴 match 的 allow，單獨加一條 deny 無法取消另一條 allow。
 - 不以正式資料測試寫入或刪除。規則先使用模擬器或測試專案驗證。
 
-目前僅以隔離模擬測試驗證；Firebase 控制台要求登入，因此尚未修改或確認正式規則。
+2026-10-15 已在 salonpos-system / (default) 發布 firestore.rules。
+Firebase 規則測試區：原始 Token update 拒絕、Backups update/delete 拒絕、含 content 字串的 Backups create 獲准、Token 與 Backups get 獲准。全程僅模擬，未對正式資料寫入。
+原規則為 /SalonPOS/{document=**} allow read, write: if true；新規則收緊 Token 及備份寫入，沒有新增公開權限。既有無登入驗證架構仍保留，這次防覆寫不等於完成身分驗證。管理員權限不受客戶端安全規則限制。
+舊裝置須重新載入至 1005.1，舊版上傳將被拒絕。
 版本會持續累積，不做自動清理。原有單文件大小上限仍適用每一個版本。
