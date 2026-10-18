@@ -4,7 +4,7 @@ const SalonContext=React.createContext(null);
 
         // --- 1. Icons ---
         const Icon = ({ children, size = 20, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={"salon-icon "+className}>{children}</svg>
         );
         const Icons = {
             Scissors: (p)=><Icon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></Icon>,
@@ -47,21 +47,21 @@ const SalonContext=React.createContext(null);
             ClipboardList: (p)=><Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>,
             Palette: (p)=><Icon {...p}><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></Icon>
         };
+        Object.assign(Icons,{
+          Activity:p=><Icon {...p}><rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" fillOpacity=".1" stroke="none"/><path d="M6 16V12m6 4V7m6 9v-6"/><path d="M5 20h14" opacity=".45"/></Icon>,
+          User:p=><Icon {...p}><circle cx="12" cy="8" r="4" fill="currentColor" fillOpacity=".12"/><path d="M4 21v-2c0-4 3-6 8-6s8 2 8 6v2"/><path d="M7 20h10" opacity=".4"/></Icon>,
+          Wallet:p=><Icon {...p}><rect x="3" y="6" width="18" height="15" rx="5" fill="currentColor" fillOpacity=".1"/><path d="M5 7V5a2 2 0 0 1 2-2h10v3"/><path d="M21 12h-5a2 2 0 0 0 0 5h5"/><circle cx="16.5" cy="14.5" r=".7" fill="currentColor" stroke="none"/></Icon>,
+          ClipboardList:p=><Icon {...p}><rect x="4" y="4" width="16" height="18" rx="5" fill="currentColor" fillOpacity=".1"/><rect x="8" y="2" width="8" height="5" rx="2.5" fill="white"/><path d="M8 12h8m-8 5h5"/></Icon>,
+          TrendingUp:p=><Icon {...p}><path d="M3 20V7a3 3 0 0 1 3-3h14v16z" fill="currentColor" fillOpacity=".08" stroke="none"/><path d="M4 16l5-5 4 3 7-9m-6 0h6v6"/><path d="M4 21h16" opacity=".4"/></Icon>,
+          DollarSign:p=><Icon {...p}><circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity=".1" stroke="none"/><path d="M16 7h-5a2.5 2.5 0 0 0 0 5h2a2.5 2.5 0 0 1 0 5H8m4-13v16"/></Icon>
+        });
         const { Scissors, User, Settings, Plus, Trash2, CreditCard, Banknote, Smartphone, CheckCircle, Menu, X, Box, Search, UserPlus, Save, Download, Upload, Table, Hand, Edit, LogOut, RefreshCw, UserCog, Tag, PauseCircle, PlayCircle, Truck, DollarSign, Briefcase, Activity, Droplets, Zap, Wifi, Phone, Wallet, Coffee, TrendingUp, ClipboardList, Palette } = Icons;
 
         // --- 2. Utils ---
         const formatCurrency = (n) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(n);
-        const generateId = () => Math.random().toString(36).substr(2, 9);
-        const getCurrentDateTimeLocal = () => {
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            return now.toISOString().slice(0, 16);
-        };
-        const getCurrentDateLocal = () => {
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            return now.toISOString().slice(0, 10);
-        };
+        const generateId = () => crypto.randomUUID();
+        const getCurrentDateTimeLocal = () => SalonStore.dateTime(new Date());
+        const getCurrentDateLocal = () => SalonStore.day(new Date());
 
         // --- 3. Defaults & Color Themes ---
         const DEFAULT_CATEGORIES = ['剪髮', '洗髮', '染燙', '護理', '造型', '產品'];
@@ -104,12 +104,13 @@ function useStickyState(key, defaultValue) {
     const persist=next=>{const task=SalonStore.set(key,next,value);task.catch(e=>window.dispatchEvent(new CustomEvent('pos-save-error',{detail:e.message})));return task;};
     return [value,persist];
 }
-function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSubscribe,SalonStore.cloudSnapshot);return <div role="status" className={'save-status '+(state.state==='error'?'save-error':'')}>{state.message}</div>;}
+function useSaveGuard(){const lock=React.useRef(false);return async work=>{if(lock.current)return;lock.current=true;try{return await work();}finally{lock.current=false;}};}
+function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSubscribe,SalonStore.cloudSnapshot);return <div role="status" className={'save-status '+(state.state==='error'?'save-error':'')}><span className={'sync-dot '+state.state}/>{state.message}</div>;}
 
         // --- 5. Components ---
         const Modal = ({ title, onClose, children, size="max-w-md" }) => (
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                <div className={`bg-white rounded-2xl w-full ${size} p-6 shadow-2xl flex flex-col max-h-[90vh]`}>
+                <div role="dialog" aria-modal="true" data-pos-modal="true" className={`bg-white rounded-2xl w-full ${size} p-6 shadow-2xl flex flex-col max-h-[90vh]`}>
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
                         <h3 className="text-xl font-bold text-slate-800">{title}</h3>
                         <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
@@ -123,7 +124,7 @@ function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSu
             if (!isOpen) return null;
             return (
                 <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+                    <div data-pos-modal="true" className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
                         <h3 className="text-lg font-bold text-slate-800 mb-2">{title}</h3>
                         <p className="text-slate-600 mb-6">{message}</p>
                         <div className="flex gap-3">
@@ -169,14 +170,14 @@ function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSu
         };
 
         const StatCard = ({ title, value, subValue, icon: IconColor, colorClass }) => (
-            <div className={`card p-6 border-l-4 ${colorClass}`}>
+            <div className={`card stat-card p-6 border-l-4 ${colorClass}`}>
                 <div className="flex justify-between items-start">
                     <div>
                         <div className="text-slate-400 text-sm font-bold mb-1 uppercase tracking-wide">{title}</div>
                         <div className="text-3xl font-black text-slate-800">{value}</div>
                         {subValue && <div className="text-sm text-slate-500 mt-1 font-medium">{subValue}</div>}
                     </div>
-                    <div className={`p-3 rounded-xl bg-opacity-10 ${colorClass.replace('border-', 'bg-').replace('500', '100')}`}>
+                    <div className={`glass-icon p-3 rounded-xl bg-opacity-10 ${colorClass.replace('border-', 'bg-').replace('500', '100')}`}>
                         <IconColor className={`w-6 h-6 ${colorClass.replace('border-', 'text-')}`} />
                     </div>
                 </div>
@@ -235,7 +236,8 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             const safeServices = Array.isArray(services) ? services.filter(x=>!x.archived) : [];
             const safeStylists = Array.isArray(stylists) ? stylists.filter(x=>!x.archived) : [];
             const safeCustomers = useMemo(()=>Array.isArray(customers)?customers.filter(x=>!x.archived).map(c=>({...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:c.visits??c.Visits??0,totalSpend:c.totalSpend??c.TotalSpend??0})):[],[customers]);
-            useEffect(()=>{document.documentElement.dataset.salonTheme=settings.appearance?.theme||'glass';document.documentElement.dataset.salonText=settings.appearance?.textSize||'standard';document.documentElement.dataset.salonMotion=settings.appearance?.motion===false?'off':'on';document.documentElement.dataset.salonDensity=settings.appearance?.density||'comfortable';document.documentElement.dataset.salonShape=settings.appearance?.shape||'soft';document.documentElement.dataset.salonPalette=settings.appearance?.palette||'slate';document.documentElement.dataset.salonWeight=settings.appearance?.weight||'normal';document.documentElement.dataset.salonEffect=settings.appearance?.effect||'light';document.documentElement.style.setProperty('--salon-accent',settings.appearance?.accent||'#526675');document.documentElement.style.setProperty('--salon-columns',settings.appearance?.columns||3);},[settings.appearance]);
+            useEffect(()=>{document.documentElement.dataset.salonTheme=settings.appearance?.theme||'glass';document.documentElement.dataset.salonText=settings.appearance?.textSize||'standard';document.documentElement.dataset.salonMotion=settings.appearance?.motion===false?'off':'on';document.documentElement.dataset.salonDensity=settings.appearance?.density||'comfortable';document.documentElement.dataset.salonShape=settings.appearance?.shape||'soft';document.documentElement.dataset.salonPalette=settings.appearance?.palette||'slate';document.documentElement.dataset.salonWeight=settings.appearance?.weight||'normal';document.documentElement.dataset.salonEffect=settings.appearance?.effect||'blur';document.documentElement.style.setProperty('--salon-accent',settings.appearance?.accent||'#526675');document.documentElement.style.setProperty('--salon-columns',settings.appearance?.columns||3);document.documentElement.style.setProperty('--glass-alpha',Math.max(.45,Math.min(1,Number(settings.appearance?.opacity??80)/100)));document.documentElement.style.setProperty('--glass-blur',(settings.appearance?.blur??16)+'px');document.documentElement.style.setProperty('--salon-tint',settings.appearance?.tint||'#e5edf3');document.documentElement.dataset.salonLayout=settings.appearance?.layout||'balanced';},[settings.appearance]);
+            useEffect(()=>SalonStore.startSync(),[]);
             const safeTransactions = Array.isArray(transactions) ? transactions : [];
             const safeInventoryLogs = Array.isArray(inventoryLogs) ? inventoryLogs : [];
             const safeExpenses = Array.isArray(expenses) ? expenses.filter(x=>!x.archived) : [];
@@ -290,17 +292,17 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
      
             return (
                 <SalonContext.Provider value={{safeTransactions,showToast,confirmAction,transactions,setTransactions,customers,setCustomers,safeCustomers,safeStylists,safeSettings,getThemeClasses,safeExpenses,setExpenses,safeServices,setServices,setInventoryLogs,safeInventoryLogs,setPendingOrders,safePendingOrders,setStylists,settings,setSettings}}><div className="flex h-screen overflow-hidden bg-slate-100">
-                    <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
+                    <aside className="salon-sidebar hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
                         <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'} ].map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1005.1</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1006.0</div>
                     </aside>
                     
                     {/* 手機版全螢幕選單 */}
                     {isMobileMenuOpen && (
-                        <div className="lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
+                        <div className="mobile-menu lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
                             <div className="flex justify-between items-center py-6 border-b border-white/10">
                                 <div className="font-bold text-xl">系統選單</div>
                                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X size={32}/></button>
@@ -319,14 +321,14 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                     {/* 主內容區 */}
                     <main className="flex-1 w-full h-screen overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top)]">
                         {/* 手機版頂欄 */}
-                        <div className="lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
+                        <div className="mobile-header lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
                             <div className="font-bold flex items-center gap-2 text-slate-800">
                                 <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
                             </div>
                             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg active:bg-slate-200"><Menu size={24}/></button>
                         </div>
 
-                        <div className="flex-1 overflow-auto bg-slate-50">
+                        <div className="workspace-content flex-1 overflow-auto bg-slate-50">
                             {activeTab === 'pos' && <POSView />}
                             {activeTab === 'orders' && <OrderView />}
                             
@@ -338,7 +340,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         </div>
                     </main>
 
-                    <nav className="mobile-quick-nav lg:hidden" aria-label="常用功能">{[{id:'pos',label:'開單'},{id:'orders',label:'查單'},{id:'customers',label:'顧客'},{id:'report',label:'報表'}].map(item=><button key={item.id} className={activeTab===item.id?'active':''} onClick={()=>setActiveTab(item.id)}>{item.label}</button>)}</nav><ConfirmModal {...confirmDialog} /><div className="global-status"><CloudStatus/></div>
+                    <nav className="mobile-quick-nav lg:hidden" aria-label="常用功能">{[{id:'pos',label:'開單'},{id:'orders',label:'查單'},{id:'customers',label:'顧客'},{id:'report',label:'報表'}].map(item=><button key={item.id} className={activeTab===item.id?'active':''} onClick={()=>setActiveTab(item.id)}><span className="nav-icon">{item.id==='pos'?<Scissors size={21}/>:item.id==='orders'?<ClipboardList size={21}/>:item.id==='customers'?<User size={21}/>:<Activity size={21}/>}</span><span>{item.label}</span></button>)}</nav><ConfirmModal {...confirmDialog} /><div className="global-status"><CloudStatus/></div>
                     {notification && (
                         <div className={`pointer-events-none fixed bottom-14 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-fade-in text-white font-bold flex items-center gap-2 whitespace-nowrap ${notification.type==='error'?'bg-red-500':'bg-slate-800'}`}>
                             {notification.type==='error'?<X size={20}/>:<CheckCircle size={20}/>} {notification.msg}
@@ -431,6 +433,7 @@ const {setCustomers,safeCustomers,showToast,safeStylists}=React.useContext(Salon
 };
 
 const SettingsView = () => {
+const runSave=useSaveGuard();
 const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,safeTransactions,safeSettings,safeInventoryLogs,safeExpenses,setServices,setStylists,setCustomers,setTransactions,setExpenses,setInventoryLogs,confirmAction}=React.useContext(SalonContext);
 
     const [categoryInput, setCategoryInput] = useState('');
@@ -477,7 +480,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
 
     const handleSaveItem = async () => {
         if (!(itemForm.name||'').trim() || itemForm.price==='') { alert('請輸入名稱與價格'); return; }
-        try{SalonStore.money(itemForm.price);SalonStore.money(itemForm.cost||0);if(!itemForm.isProduct&&(itemForm.costMode||(Number(itemForm.cost)>100?'fixed':'percent'))==='percent'&&Number(itemForm.cost)>100)throw Error('百分比不可大於100；固定金額請切換成本模式');}catch(e){showToast(e.message,'error');return;}
+        try{if(itemForm.isProduct&&(!Number.isInteger(Number(itemForm.lowStock??5))||Number(itemForm.lowStock??5)<0))throw Error('低庫存提醒需為非負整數');SalonStore.money(itemForm.price);SalonStore.money(itemForm.cost||0);if(!itemForm.isProduct&&(itemForm.costMode||(Number(itemForm.cost)>100?'fixed':'percent'))==='percent'&&Number(itemForm.cost)>100)throw Error('百分比不可大於100；固定金額請切換成本模式');}catch(e){showToast(e.message,'error');return;}
         const newItem = { ...itemForm, price: Number(itemForm.price), cost: Number(itemForm.cost || 0), costMode:itemForm.isProduct?'fixed':(itemForm.costMode||(Number(itemForm.cost)>100?'fixed':'percent')), stock: itemForm.isProduct ? Number(itemForm.stock||0) : null };
         try{if (newItem.id) await setServices(safeServices.map(s => s.id === newItem.id ? newItem : s));
         else await setServices([...safeServices, { ...newItem, id: generateId() }]);}catch{return;}
@@ -534,8 +537,8 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 </div>
             </div>
 
-            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={!!safeSettings.autoCloudBackup} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,autoCloudBackup:checked}));}}/>開啟背景自動備份（請先成功手動備份一次）</label><p className="text-sm text-slate-500">本機先保存，背景再備份。防誤覆蓋已啟用：訂單、顧客、支出、庫存紀錄、服務商品及人員，筆數少於雲端或缺少原有資料時，禁止上傳。封存與作廢會保留原始識別碼，不會因筆數減少而阻擋備份；掛單與草稿不比較筆數。</p></div>
-            <details className="card p-5"><summary className="font-bold">雲端歷史備份 · 每次新增，保留舊版</summary><p className="text-sm text-slate-500 my-3">新版不會覆寫或刪除原始備份。還原歷史版本只改變此裝置，且會關閉自動備份。請所有裝置更新到 1005.1；後台仍須限制舊版寫入。</p><button className="btn btn-secondary" disabled={cloudWorking} onClick={listBackups}>讀取雲端版本清單</button>{backupVersions&&<label className="block mt-3">還原來源<select className="input-field mt-2" value={selectedBackup} onChange={e=>setSelectedBackup(e.target.value)}><option value="">最新版本（預設）</option><option value="legacy">原始舊備份（保留）</option>{backupVersions.map(v=><option key={v.versionId} value={v.versionId}>{SalonStore.dateTime(v.createTime)} · {v.versionId.slice(0,8)}</option>)}</select><p className="text-sm mt-2">選好後使用上方「從雲端還原到此裝置」。會先保留本機還原前副本。</p></label>}</details><AppearanceSettings/><ArchiveSettings/>
+            <div className="card p-5 space-y-3"><CloudStatus/><label className="flex gap-3 items-center"><input type="checkbox" checked={safeSettings.autoSync!==false} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,autoSync:checked,autoCloudBackup:false}));}}/>自動接收更新與版本備份</label><p className="text-sm text-slate-500">開啟頁面、恢復連線、儲存後自動檢查；頁面開啟時每 60 秒同步。正在輸入或開單時先保留草稿，完成操作再合併。同一筆資料兩邊都修改時暫停，不直接覆蓋。背景關閉的網頁無法持續同步。</p><button className="btn btn-secondary" onClick={()=>SalonStore.cloudSync(true).catch(e=>showToast(e.message,'error'))}>立即檢查與同步</button></div>
+            <details className="card p-5"><summary className="font-bold">雲端歷史備份 · 每次新增，保留舊版</summary><p className="text-sm text-slate-500 my-3">新版不會覆寫或刪除原始備份。還原歷史版本只改變此裝置，且會關閉自動備份。後台已限制既有版本的修改與刪除。請所有裝置使用 1006.0。</p><button className="btn btn-secondary" disabled={cloudWorking} onClick={listBackups}>讀取雲端版本清單</button>{backupVersions&&<label className="block mt-3">還原來源<select className="input-field mt-2" value={selectedBackup} onChange={e=>setSelectedBackup(e.target.value)}><option value="">最新版本（預設）</option><option value="legacy">原始舊備份（保留）</option>{backupVersions.map(v=><option key={v.versionId} value={v.versionId}>{SalonStore.dateTime(v.createTime)} · {v.versionId.slice(0,8)}</option>)}</select><p className="text-sm mt-2">選好後使用上方「從雲端還原到此裝置」。會先保留本機還原前副本。</p></label>}</details><AppearanceSettings/><WalletSettings/><ArchiveSettings/>
             {/* 營業項目管理列表 */}
             <div className="card p-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -592,7 +595,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
             <div className="card p-8">
                 <h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3>
                 <label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input type="checkbox" checked={safeSettings.deductCostBeforeCommission} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,deductCostBeforeCommission:checked}));}} className="w-5 h-5 accent-indigo-600"/> 
+                    <input type="checkbox" disabled checked={true} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,deductCostBeforeCommission:checked}));}} className="w-5 h-5 accent-indigo-600"/> 
                     <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span>
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -666,7 +669,8 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                                 <div><div className="font-bold text-slate-700">啟用庫存管理</div></div>
                             </label>
                         </div>
-                        <button onClick={handleSaveItem} className="btn btn-primary w-full py-4 mt-2 shadow-md">儲存項目</button>
+                        {itemForm.isProduct&&<label className="block text-sm">低庫存提醒數量<input aria-label="低庫存提醒數量" type="number" min="0" step="1" className="input-field mt-2" value={itemForm.lowStock??5} onChange={e=>setItemForm({...itemForm,lowStock:Number(e.target.value)})}/></label>}
+                        <button onClick={()=>runSave(handleSaveItem)} className="btn btn-primary w-full py-4 mt-2 shadow-md">儲存項目</button>
                     </div>
                 </Modal>
             )}
@@ -675,6 +679,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
 };
 
 const CustomerView = () => {
+const runSave=useSaveGuard();
 const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSettings,getThemeClasses,safeTransactions}=React.useContext(SalonContext);
 
                 const [searchTerm, setSearchTerm] = useState('');
@@ -712,15 +717,15 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                 return (
                     <div className="p-6 md:p-10 h-full overflow-y-auto">
                         <div className="max-w-6xl mx-auto">
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                            <div className="page-heading mb-8">
                                 <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><User size={28} className="text-indigo-500"/> 客戶資料 ({filtered.length})</h2>
-                                <div className="flex gap-2 w-full md:w-auto">
+                                <div className="customer-toolbar">
                                     <select className="input-field w-36 font-bold text-slate-700" value={filterStylist} onChange={(e) => setFilterStylist(e.target.value)}>
                                         <option value="all">全部設計師</option>
                                         <option value="">(未指定)</option>
                                         {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                     </select>
-<div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input type="text" className="input-field pl-10 py-2" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                                    <button onClick={()=>{setEditForm({tags:[]}); setIsEditing(true);}} className="btn btn-primary whitespace-nowrap"><UserPlus size={18}/> 新增顧客</button>
+<div className="search-field customer-search"><Search className="absolute left-3 top-2.5 text-slate-400" size={18}/><input type="text" className="input-field pl-10 py-2" aria-label="搜尋顧客姓名或電話" placeholder="搜尋姓名或電話" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                                    <button onClick={()=>{setEditForm({tags:[]}); setIsEditing(true);}} className="btn btn-primary whitespace-nowrap"><UserPlus size={18}/> 新增顧客</button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -746,13 +751,14 @@ const {safeCustomers,setCustomers,showToast,confirmAction,safeStylists,safeSetti
                             </div>
                             {filtered.length === 0 && <div className="text-center text-slate-400 py-20 bg-white rounded-xl border border-dashed">查無相關顧客資料</div>}
                         </div>
-                        {isEditing && (<Modal title={editForm.id ? '編輯顧客資料' : '新增顧客'} onClose={()=>setIsEditing(false)}><div className="space-y-5"><div className="grid grid-cols-2 gap-5"><div><label className="text-xs font-bold text-slate-500 mb-1 block">姓名</label><input className="input-field" value={editForm.name||''} onChange={e=>setEditForm({...editForm, name:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">電話</label><input className="input-field" value={editForm.phone||''} onChange={e=>setEditForm({...editForm, phone:e.target.value})}/></div></div><div className="flex gap-2"><select className="input-field w-32" value={editForm.gender} onChange={e=>setEditForm({...editForm, gender:e.target.value})}><option value="女">女客</option><option value="男">男客</option><option value="兒童">兒童</option></select><div className="flex-1"><label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師</label><select className="input-field" value={editForm.preferredStylistId || ''} onChange={e=>setEditForm({...editForm, preferredStylistId: e.target.value})}><option value="">未指定</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div><div><label className="text-sm font-bold text-slate-500">生日</label><input type="date" className="input-field" value={editForm.birthday||''} onChange={e=>setEditForm({...editForm,birthday:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">備註事項</label><textarea className="input-field" rows="3" value={editForm.notes||''} onChange={e=>setEditForm({...editForm, notes:e.target.value})}/></div><button onClick={handleSave} className="btn btn-primary w-full py-3">儲存資料</button></div></Modal>)}
-                        <button className="btn btn-secondary my-3" hidden={visibleCount>=filtered.length} onClick={()=>setVisibleCount(n=>n+60)}>載入更多顧客（共 {filtered.length} 位）</button>{viewingCustomer && !isEditing && (<Modal title={`${viewingCustomer.name} 的消費紀錄`} onClose={()=>setViewingCustomer(null)} size="max-w-2xl"><div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200"><div><div className="text-sm text-slate-500">會員電話</div><div className="font-bold font-mono text-lg">{viewingCustomer.phone}</div><div>生日：{viewingCustomer.birthday||'未填寫'}</div></div><div className="text-right"><div className="text-sm text-slate-500">歷史總消費</div><div className="font-black text-2xl text-indigo-600">{formatCurrency(viewingCustomer.totalSpend || 0)}</div></div></div><div className="text-sm text-slate-500">專屬設計師: <span className="font-bold text-slate-800">{safeStylists.find(s=>s.id===viewingCustomer.preferredStylistId)?.name || '未指定'}</span></div><div className="border-t pt-4"><h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Settings size={18}/> 近期消費明細</h4><div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">{safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).length===0?(<div className="text-center text-slate-400 py-8">尚無消費紀錄</div>):(safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(<div key={t.id} className="border p-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center"><div><div className="font-bold text-slate-700">{new Date(t.date).toLocaleDateString()} <span className="text-xs text-slate-400 font-normal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><div className="text-sm text-slate-500 mt-1 flex gap-2">{(t.items||[]).map((i,idx)=><span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-xs">{i.name}</span>)}</div></div><div className="text-right"><div className="font-bold text-slate-800">{formatCurrency(t.total)}</div><div className="text-xs text-slate-400">{safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未知設計師'}</div></div></div>)))}</div></div><div className="flex gap-2 pt-2"><button onClick={()=>{setEditForm(viewingCustomer); setIsEditing(true);}} className="btn btn-secondary flex-1">編輯資料</button><button onClick={()=>handleDeleteCustomer(viewingCustomer.id)} className="btn btn-danger flex-1">封存會員</button></div></div></Modal>)}
+                        {isEditing && (<Modal title={editForm.id ? '編輯顧客資料' : '新增顧客'} onClose={()=>setIsEditing(false)}><div className="space-y-5"><div className="grid grid-cols-2 gap-5"><div><label className="text-xs font-bold text-slate-500 mb-1 block">姓名</label><input className="input-field" value={editForm.name||''} onChange={e=>setEditForm({...editForm, name:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">電話</label><input className="input-field" value={editForm.phone||''} onChange={e=>setEditForm({...editForm, phone:e.target.value})}/></div></div><div className="flex gap-2"><select className="input-field w-32" value={editForm.gender} onChange={e=>setEditForm({...editForm, gender:e.target.value})}><option value="女">女客</option><option value="男">男客</option><option value="兒童">兒童</option></select><div className="flex-1"><label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師</label><select className="input-field" value={editForm.preferredStylistId || ''} onChange={e=>setEditForm({...editForm, preferredStylistId: e.target.value})}><option value="">未指定</option>{safeStylists.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div></div><div><label className="text-sm font-bold text-slate-500">生日</label><input type="date" className="input-field" value={editForm.birthday||''} onChange={e=>setEditForm({...editForm,birthday:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">備註事項</label><textarea className="input-field" rows="3" value={editForm.notes||''} onChange={e=>setEditForm({...editForm, notes:e.target.value})}/></div><button onClick={()=>runSave(handleSave)} className="btn btn-primary w-full py-3">儲存資料</button></div></Modal>)}
+                        <button className="btn btn-secondary my-3" hidden={visibleCount>=filtered.length} onClick={()=>setVisibleCount(n=>n+60)}>載入更多顧客（共 {filtered.length} 位）</button>{viewingCustomer && !isEditing && (<Modal title={`${viewingCustomer.name} 的消費紀錄`} onClose={()=>setViewingCustomer(null)} size="max-w-2xl"><div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200"><div><div className="text-sm text-slate-500">會員電話</div><div className="font-bold font-mono text-lg">{viewingCustomer.phone}</div><div>生日：{viewingCustomer.birthday||'未填寫'}</div></div><div className="text-right"><div className="text-sm text-slate-500">歷史總消費</div><div className="font-black text-2xl text-indigo-600">{formatCurrency(viewingCustomer.totalSpend || 0)}</div></div></div><WalletPanel customer={viewingCustomer}/><div className="text-sm text-slate-500">專屬設計師: <span className="font-bold text-slate-800">{safeStylists.find(s=>s.id===viewingCustomer.preferredStylistId)?.name || '未指定'}</span></div><div className="border-t pt-4"><h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Settings size={18}/> 近期消費明細</h4><div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">{safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).length===0?(<div className="text-center text-slate-400 py-8">尚無消費紀錄</div>):(safeTransactions.filter(t=>!t.voided&&t.customerId===viewingCustomer.id).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(<div key={t.id} className="border p-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center"><div><div className="font-bold text-slate-700">{new Date(t.date).toLocaleDateString()} <span className="text-xs text-slate-400 font-normal">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><div className="text-sm text-slate-500 mt-1 flex gap-2">{(t.items||[]).map((i,idx)=><span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-xs">{i.name}</span>)}</div></div><div className="text-right"><div className="font-bold text-slate-800">{formatCurrency(t.total)}</div><div className="text-xs text-slate-400">{safeStylists.find(s=>s.id===t.mainStylistId)?.name || '未知設計師'}</div></div></div>)))}</div></div><div className="flex gap-2 pt-2"><button onClick={()=>{setEditForm(viewingCustomer); setIsEditing(true);}} className="btn btn-secondary flex-1">編輯資料</button><button onClick={()=>handleDeleteCustomer(viewingCustomer.id)} className="btn btn-danger flex-1">封存會員</button></div></div></Modal>)}
                     </div>
                 );
             };
 
 const StaffView = () => {
+const runSave=useSaveGuard();
 const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useContext(SalonContext);
 
                 const [isEditing, setIsEditing] = useState(false);
@@ -842,7 +848,7 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
                                             <div><span className="text-xs text-slate-500 font-bold mb-1 block">個人抽成率 (%)</span><input type="number" className="input-field" value={editForm.commissionRate||0} onChange={e=>setEditForm({...editForm, commissionRate: Number(e.target.value)})}/></div>
                                         )}
                                     </div>
-                                    <button onClick={handleSave} className="btn btn-primary w-full mt-4">儲存人員資料</button>
+                                    <button onClick={()=>runSave(handleSave)} className="btn btn-primary w-full mt-4">儲存人員資料</button>
                                 </div>
                             </Modal>
                         )}
@@ -986,7 +992,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                                 <div className="space-y-2 pt-2">
                                     <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
                                    <div className="grid grid-cols-2 gap-2">
-    {(safeSettings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).map(name=>({name,color:paymentChoice===name?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200'})).map((item) => (
+    {[...new Set([...(safeSettings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']),...(safeSettings.walletDeviceId?['儲值金']:[])])].map(name=>({name,color:paymentChoice===name?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200'})).map((item) => (
         <button 
             key={item.name} 
             disabled={saving} aria-pressed={paymentChoice===item.name} onClick={() => setPaymentChoice(item.name)}
@@ -999,7 +1005,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
         </button>
     ))}
 </div>
-{paymentChoice==='現金'&&<label className="block text-left mt-3 text-sm">實收金額（可不填）<input aria-label="實收金額" type="number" min={cartTotal} className="input-field" value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/>{cashReceived!==''&&<span>找零：{formatCurrency(Math.max(0,Number(cashReceived)-cartTotal))}</span>}</label>}
+{paymentChoice==='儲值金'&&<p className="text-sm">{selectedCustomer?'可用儲值：'+formatCurrency(SalonStore.walletBalance(selectedCustomer.id)):'請先選擇會員'} · 僅指定收銀裝置可扣款</p>}{paymentChoice==='現金'&&<label className="block text-left mt-3 text-sm">實收金額（可不填）<input aria-label="實收金額" type="number" min={cartTotal} className="input-field" value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/>{cashReceived!==''&&<span>找零：{formatCurrency(Math.max(0,Number(cashReceived)-cartTotal))}</span>}</label>}
 <button className="btn btn-primary w-full mt-3" disabled={saving||(paymentChoice==='現金'&&cashReceived!==''&&Number(cashReceived)<cartTotal)} onClick={()=>handleCheckout(paymentChoice)}>{saving?'正在儲存…':'確認收款並完成結帳'}</button>
                                 </div>
                                 <button onClick={() => setShowCheckout(false)} className="btn btn-secondary w-full py-2.5 mt-2 text-sm">取消返回</button>
@@ -1010,14 +1016,14 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                     {/* 左側主面板：搜尋與項目選單 */}
                     <div className="pos-services flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-4 border-b space-y-3 bg-white">
-                            <div className="flex flex-col md:flex-row gap-2 items-center relative">
+                            <div className="pos-customer-fields">
                                 {/* 會員搜尋核心輸入框 */}
-                                <div className="relative w-full flex-1" id="pos-member-search-box">
+                                <div className="search-field w-full flex-1" id="pos-member-search-box">
                                     <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
                                     <input 
                                         type="text" 
                                         className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all font-medium" 
-                                        placeholder="🔍 輸入會員姓名或電話，立刻搜尋並連動開單..." 
+                                        placeholder="搜尋會員姓名或電話" aria-label="搜尋會員姓名或電話" 
                                         value={custSearch} 
                                         onChange={e => setCustSearch(e.target.value)}
                                     />
@@ -1072,7 +1078,7 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                 </div>
 
                                 {/* 右側狀態顯示分流 */}
-                                <div className="flex gap-2 w-full md:w-auto items-center">
+                                <div className="pos-customer-meta">
                                     {selectedCustomer ? (
                                         <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-200 px-3 py-2 rounded-xl text-sm font-semibold text-indigo-700 shadow-sm animate-fade-in">
                                             <span>👤 {selectedCustomer.name}</span>
@@ -1094,11 +1100,11 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                             <input 
                                                 type="text" 
                                                 className="w-36 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all placeholder-slate-400" 
-                                                placeholder="手動輸入散客..." 
+                                                placeholder="散客姓名（選填）" 
                                                 value={adHocCustomerName} 
                                                 onChange={e => setAdHocCustomerName(e.target.value)}
                                             />
-                                            <span className="absolute left-2.5 text-xs text-slate-400">👤</span>
+                                            <User className="absolute left-2.5 text-slate-400" size={16}/>
                                         </div>
                                     )}
 
@@ -1113,13 +1119,13 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                             setAdHocGender(e.target.value);
                                         }}
                                     >
-                                        <option value="女">女生 👩‍🦰</option>
-                                        <option value="男">男生 👨</option>
-                                        <option value="兒童">兒童 👶</option>
+                                        <option value="女">女客</option>
+                                        <option value="男">男客</option>
+                                        <option value="兒童">兒童</option>
                                     </select>
                                 </div>
                             </div>
-                            <input aria-label="搜尋服務或商品" className="input-field mb-3" placeholder="搜尋服務或商品…" value={serviceSearch} onChange={e=>setServiceSearch(e.target.value)}/><div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar category-tabs">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
+                            <div className="service-tools"><AppearanceSettings compact/><input aria-label="搜尋服務或商品" className="input-field mb-3" placeholder="搜尋服務或商品…" value={serviceSearch} onChange={e=>setServiceSearch(e.target.value)}/></div><div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar category-tabs">{['全部', ...safeSettings.categories].map(c => (<button key={c} onClick={()=>setSelectedCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap border transition-all ${selectedCategory===c?'bg-slate-800 text-white border-slate-800 shadow-md':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{c}</button>))}</div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
                             <div className="service-grid grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -1130,10 +1136,10 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                     const colorClass = getCategoryColor(s.category);
                                     
                                     return (
-                                        <button key={s.id} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
+                                        <button key={s.id} style={serviceTint(s,safeSettings)} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
                                             <div className="flex justify-between mb-2">
                                                 <span className="text-[10px] bg-white/80 px-2 py-0.5 rounded text-slate-500 font-bold backdrop-blur-sm">{s.category}</span>
-                                                {remaining !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${remaining<=5?'bg-red-100 text-red-500':'bg-emerald-100 text-emerald-600'}`}>存 {remaining}</span>}
+                                                {remaining !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${remaining<=(s.lowStock??5)?'bg-red-100 text-red-500':'bg-emerald-100 text-emerald-600'}`}>存 {remaining}</span>}
                                             </div>
                                             <h3 className="font-bold text-slate-800 mb-1 truncate text-lg">{s.name}</h3>
                                             <div className="text-slate-700 font-black text-lg">{formatCurrency(s.price)}</div>
@@ -1327,6 +1333,7 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
         };
 
 const InventoryView = () => {
+const runSave=useSaveGuard();
 const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,setInventoryLogs,safeInventoryLogs,safeSettings,getThemeClasses}=React.useContext(SalonContext);
 
                 const [mode, setMode] = useState('list');
@@ -1381,7 +1388,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                             
                             {mode === 'list' && (
                                 <div className="flex gap-2 w-full md:w-auto justify-end">
-                                    <div className="relative w-full md:w-64">
+                                    <div className="search-field w-full md:w-64">
                                         <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
                                         <input type="text" className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/> 
                                     </div>
@@ -1394,7 +1401,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                         {mode === 'list' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                                 {products.map(p => {
-                                    const isLowStock = p.stock <= 5; 
+                                    const isLowStock = p.stock <= (p.lowStock??5); 
                                     const themeKey = safeSettings.categoryColors[p.category] || 'slate';
                                     const badgeClass = getThemeClasses(themeKey, 'badge');
 
@@ -1495,7 +1502,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                                         </select>
                                     </div>
                                     <div className="bg-emerald-50 text-emerald-700 text-xs p-3 rounded-lg font-medium">※ 在此建立完成後，商品會直接在列表上顯示，您可以立即點擊「進貨」補上現有庫存。</div>
-                                    <button onClick={handleQuickAddProduct} className="btn btn-primary w-full py-3 shadow-md mt-2">確認商品建檔</button>
+                                    <button onClick={()=>runSave(handleQuickAddProduct)} className="btn btn-primary w-full py-3 shadow-md mt-2">確認商品建檔</button>
                                 </div>
                             </Modal>
                         )}
@@ -1564,6 +1571,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
             };
 
 const ReportView = () => {
+const runSave=useSaveGuard();
 const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpenses,getThemeClasses,confirmAction,settings,setSettings}=React.useContext(SalonContext);
 
                 const [rangeEnd,setRangeEnd]=useState(getCurrentDateLocal());
@@ -1610,7 +1618,7 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
                 const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
                 const paymentMethodStats = useMemo(() => {
-                    const stats = {};
+                    const stats = Object.fromEntries((safeSettings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).map(k=>[k,0]));
                     reportTx.forEach(t => {
                         const method = t.paymentMethod || '其他';
                         if (!stats[method]) stats[method] = 0;
@@ -1620,40 +1628,8 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
                 }, [reportTx]);
 
 // 搜尋這行並替換整個 useMemo
-const calculatedSalary = useMemo(() => {
-    return SalonStore.all().stylists.filter(s=>!s.archived||reportTx.some(t=>(t.items||[]).some(i=>(String(i.stylistId)===String(s.id)||String(i.assistantId)===String(s.id))))).map(s => {
-        let serviceRevenue = 0, productRevenue = 0, serviceCommission = 0, productCommission = 0, assistantCommission=0;
-        
-        // 確保 reportTx 有資料才跑迴圈，避免 undefined 錯誤
-        if (reportTx) {
-            reportTx.forEach(t => {
-                (t.items || []).forEach(item => {if(String(item.assistantId)===String(s.id))assistantCommission+=Number(item.assistantFee||0);
-                    if (String(item.stylistId) === String(s.id)) {
-                        const amount = (Number(item.price) || 0) - (Number(item.discount) || 0);
-                        let base = amount;
-                        if (item.deductCost ?? safeSettings.deductCostBeforeCommission) {
-                            base = amount - SalonStore.itemCost(item,amount);
-                        }
-                        let rate = item.commissionRate ?? (s.useGlobalCommission ? (safeSettings.commissionRates[item.category] || 0) : (s.commissionRate || 0));
-                        const comm = Math.round(base * (rate / 100));
-                        if (item.isProduct) { 
-                            productRevenue += amount; 
-                            productCommission += comm; 
-                        } else { 
-                            serviceRevenue += amount; 
-                            serviceCommission += comm; 
-                        }
-                    }
-                });
-            });
-        }
-        
-        // 避免這裡產生 NaN
-        const advanceTotal = (reportExp || []).filter(e => e.type === '員工借支' && String(e.staffId || e.relatedStaffId) === String(s.id)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        const totalSalary = (reportMode === 'month' ? (Number(s.baseSalary)||0) + (Number(s.positionBonus)||0) + (Number(s.attendanceBonus)||0) : 0) + serviceCommission + productCommission + assistantCommission - advanceTotal;
-        return { ...s, serviceRevenue, productRevenue, totalCommission: serviceCommission+productCommission+assistantCommission, advanceTotal, totalSalary };
-    });
-}, [reportTx, reportExp, safeStylists, safeSettings,reportMode]);
+const metrics=useMemo(()=>SalonStore.financials(reportTx,reportExp,SalonStore.all().stylists,safeSettings,reportMode==='month'),[reportTx,reportExp,safeStylists,safeSettings,reportMode]);
+const calculatedSalary=metrics.rows.filter(s=>!s.archived||s.visits||s.assistantCommission);
 const lockedSalary=reportMode==='month'?settings.payrollLocks?.[queryDate]:null;
 const salaryReport=lockedSalary?.rows||calculatedSalary;
 const categoryNames=[...new Set([...safeSettings.categories,...reportTx.flatMap(t=>(t.items||[]).map(i=>i.category||'未分類'))])];
@@ -1663,7 +1639,7 @@ const grossProfit=totalRevenue-salesCost;
 const operatingExpense=reportExp.filter(e=>!e.inventoryPurchase&&!['進貨付款','員工借支','薪資發放'].includes(e.type)).reduce((n,e)=>n+Number(e.amount||0),0);
 const salaryCost=salaryReport.reduce((n,s)=>n+Number(s.totalSalary||0)+Number(s.advanceTotal||0),0);
 const lockPayroll=()=>confirmAction('鎖定本月薪資','保存目前薪資結果。後續更正訂單或設定不會自動改動這份結算，請先解鎖再核對。',async()=>{try{await setSettings(p=>({...p,payrollLocks:{...p.payrollLocks,[queryDate]:{at:new Date().toISOString(),rows:calculatedSalary}}}));showToast('本月薪資已鎖定');}catch{}});
-const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=[['日期','單號','顧客','付款方式','金額'],...reportTx.map(t=>[SalonStore.dateTime(t.date),t.id,t.customerName,t.paymentMethod,t.total])];const text='\ufeff'+rows.map(row=>row.map(v=>quote(typeof v==='string'&&/^[=+@-]/.test(v)?"'"+v:v)).join(',')).join('\r\n');const u=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='salon-report-'+queryDate+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
+const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=view==='salary'?[['設計師','虛業績','實業績','商品營收','抽成合計','底薪津貼','借支','預估實領'],...salaryReport.map(s=>[s.name,s.serviceRevenue,s.realRevenue,s.productRevenue,s.totalCommission,s.fixedPay,s.advanceTotal,s.totalSalary])]:view==='expense'?[['日期','類別','說明','金額'],...reportExp.map(e=>[e.date,e.type,e.note,e.amount])]:[['期間',queryDate,reportMode==='range'?rangeEnd:''],['總營業額',totalRevenue],['虛業績',metrics.serviceRevenue],['實業績',metrics.realRevenue],['已登記支出',totalExpense],['薪資',salaryCost],['預估營業損益',grossProfit-operatingExpense-salaryCost],[],['日期','單號','顧客','付款方式','金額'],...reportTx.map(t=>[SalonStore.dateTime(t.date),t.id,t.customerName,t.paymentMethod,t.total])];const text='\ufeff'+rows.map(row=>row.map(v=>quote(typeof v==='string'&&/^[=+@-]/.test(v)?"'"+v:v)).join(',')).join('\r\n');const u=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='salon-report-'+queryDate+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
                 const categoryCountReport = useMemo(() => {
                     return safeStylists.map(s => {
                         const counts = {};
@@ -1682,7 +1658,7 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 
        const addExpense = async () => {
     // 1. 金額檢查
-    const expenseAmount = Number(newExpense.amount);
+    let expenseAmount;try{expenseAmount=SalonStore.money(newExpense.amount);if(!SalonStore.day(newExpense.date))throw Error('請選擇正確日期');}catch(e){showToast(e.message,'error');return;}
     if (!newExpense.amount || isNaN(expenseAmount) || expenseAmount <= 0) {
         showToast('請輸入有效的金額', 'error');
         return;
@@ -1712,15 +1688,15 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 };
                 return (
                     <div className="p-4 md:p-8 h-full overflow-y-auto">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                            <div className="flex bg-white p-1.5 rounded-xl shadow-sm border border-slate-200">
-                                {[{id:'dashboard', icon:Activity, label:'營運儀表'}, {id:'salary', icon:User, label:'人員薪資'}, {id:'expense', icon:DollarSign, label:'支出管理'}].map(tab => (
+                        <div className="page-heading mb-6">
+                            <div className="report-tabs">
+                                {[{id:'dashboard', icon:Activity, label:'營運總覽'}, {id:'salary', icon:User, label:'人員薪資'}, {id:'expense', icon:Wallet, label:'支出管理'}].map(tab => (
                                     <button key={tab.id} onClick={()=>setView(tab.id)} className={`px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all ${view===tab.id ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
-                                        <tab.icon size={18}/> {tab.label}
+                                        <span className="glass-icon"><tab.icon size={22}/></span><span>{tab.label}</span>
                                     </button>
                                 ))}
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                            <div className="report-period">
                                 <div className="flex gap-1 border-r pr-3 mr-2">
                                     <button onClick={()=>handleModeChange('day')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='day'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>日報</button>
                                     <button onClick={()=>handleModeChange('month')} className={`px-2 py-1 text-xs rounded font-bold ${reportMode==='month'?'bg-indigo-100 text-indigo-600':'text-slate-400 hover:text-slate-600'}`}>月報</button>
@@ -1735,13 +1711,13 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 
                         {view === 'dashboard' && (
                             <div className="space-y-8 animate-fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <StatCard title={'期間總營收'} value={formatCurrency(totalRevenue)} icon={TrendingUp} colorClass="border-indigo-500" />
-                                    <StatCard title={'現金支出登記'} value={formatCurrency(totalExpense)} icon={Wallet} colorClass="border-rose-500" />
-                                    <StatCard title="收支結餘" value={formatCurrency(netProfit)} subValue={`結餘率: ${totalRevenue>0?((netProfit/totalRevenue)*100).toFixed(1):0}%`} icon={DollarSign} colorClass={netProfit>=0?"border-emerald-500":"border-red-500"} />
+                                <div className="stats-grid">
+                                    <StatCard title={'總營業額'} value={formatCurrency(totalRevenue)} icon={TrendingUp} colorClass="border-indigo-500" />
+                                    <StatCard title={'已登記支出'} value={formatCurrency(totalExpense)} icon={Wallet} colorClass="border-rose-500" />
+                                    <StatCard title="預估營業損益" value={formatCurrency(grossProfit-operatingExpense-salaryCost)} subValue="已扣成本、薪資與營業費用" icon={DollarSign} colorClass={netProfit>=0?"border-emerald-500":"border-red-500"} />
                                     <StatCard title="完成單數" value={totalOrders} subValue={`平均客單: ${formatCurrency(avgOrderValue)}`} icon={User} colorClass="border-amber-500" />
                                 </div>
-                                <div className="card p-6 space-y-3"><h3 className="font-bold text-lg">成本與損益試算</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div>銷貨／服務成本<strong className="block text-xl">{formatCurrency(salesCost)}</strong></div><div>毛利<strong className="block text-xl">{formatCurrency(grossProfit)}</strong></div><div>薪資{lockedSalary?'（已鎖定）':'（試算）'}<strong className="block text-xl">{formatCurrency(salaryCost)}</strong></div><div>{reportMode==='month'?'預估營業損益':'扣成本、費用與抽成後結餘'}<strong className="block text-xl">{formatCurrency(grossProfit-operatingExpense-salaryCost)}</strong></div></div><p className="text-sm text-slate-500">依訂單成本及已登記費用試算。進貨付款、借支及「薪資發放」不重複扣除；月報包含底薪津貼，其他區間尚未分攤底薪。未登記成本、費用不會自動補入。成本與自領料請依實際用途登記，避免重複。</p></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div className="performance-flow card"><div><span>虛業績 · 服務</span><strong>{formatCurrency(metrics.serviceRevenue)}</strong><small>折扣後，不含商品</small></div><span className="flow-arrow">→</span><div><span>實業績 · 服務</span><strong>{formatCurrency(metrics.realRevenue)}</strong><small>扣材料、協助費</small></div><span className="flow-arrow">→</span><div><span>人員薪資{lockedSalary?' · 已鎖定':''}</span><strong>{formatCurrency(salaryCost)}</strong><small>抽成＋底薪津貼（依期間）</small></div></div><details className="card p-5"><summary>看懂收支與計算方式</summary><div className="metric-details"><p>總營業額：服務＋商品，儲值充值不重複計入。</p><p>銷貨／服務成本 {formatCurrency(salesCost)} · 營業費用 {formatCurrency(operatingExpense)}</p><p>新單：實業績＝虛業績－材料－協助費；抽成＝實業績 × 比例。舊單保留原有抽成規則，不重算已結薪資。</p><p>進貨付款、借支與薪資發放不在損益中重複扣除。月報包含底薪津貼，日／年／自訂區間僅計抽成，未分攤底薪。未登記費用不會自動補入。</p><WalletSummary prefix={queryDate} mode={reportMode} end={rangeEnd} revenue={totalRevenue} expenses={totalExpense} tx={reportTx}/></div></details><div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     <div className="card p-6">
                                         <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Scissors size={20} className="text-indigo-500"/> 服務項目營收佔比</h3>
                                         <div className="space-y-5">
@@ -1784,60 +1760,14 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
                             </div>
                         )}
 
-                        {view === 'salary' && (
-                            <div className="space-y-8 animate-fade-in">
-                                <div className="card overflow-hidden">
-                                    <div className="p-4 flex flex-wrap gap-3">{reportMode==='month'&&(lockedSalary?<><span>已鎖定：{SalonStore.dateTime(lockedSalary.at)}</span><button className="btn btn-secondary" onClick={()=>confirmAction('解鎖薪資','解鎖後將依目前資料重新計算，確定？',async()=>{try{await setSettings(p=>{const locks={...p.payrollLocks};delete locks[queryDate];return {...p,payrollLocks:locks};});}catch{}})}>解鎖重新核對</button></>:<button className="btn btn-primary" onClick={lockPayroll}>確認並鎖定本月薪資</button>)}</div><div className="p-4 border-b bg-slate-50 font-bold text-slate-700">薪資結算表 ({reportMode==='year'?'年度':reportMode==='month'?'月度':'當日'})</div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                                                <tr><th className="p-5 sticky left-0 bg-white">設計師</th><th className="p-5 text-right">技術業績</th><th className="p-5 text-right">販賣業績</th><th className="p-5 text-right text-indigo-600">抽成總額</th><th className="p-5 text-right">底薪+津貼</th><th className="p-5 text-right text-rose-500">借支扣款</th><th className="p-5 text-right font-black bg-indigo-50/50">{reportMode==='month'?'預估實領薪資':'抽成減借支'}</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                               
-                                         {salaryReport.map(s => (
-                                                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="p-5 font-bold text-slate-800 sticky left-0 bg-white">
-                                                            {s.name} <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-2">{s.role}</span>
-                                                        </td>
-                                                        <td className="p-5 text-right text-slate-600">{formatCurrency(s.serviceRevenue)}</td>
-                                                        <td className="p-5 text-right text-slate-600">{formatCurrency(s.productRevenue)}</td>
-                                                        <td className="p-5 text-right font-bold text-indigo-600">{formatCurrency(s.totalCommission)}</td>
-                                                        
-                                                        {/* 💡 核心修正：正確加總底薪、職務加給與全勤獎金 */}
-                                                        <td className="p-5 text-right text-slate-600">{formatCurrency(reportMode==='month'?(s.baseSalary||0)+(s.positionBonus||0)+(s.attendanceBonus||0):0)}</td>
-                                                        
-                                                        <td className="p-5 text-right text-rose-500 font-bold">-{formatCurrency(s.advanceTotal)}</td>
-                                                        <td className="p-5 text-right font-black text-lg bg-indigo-50/30 text-slate-800">{formatCurrency(s.totalSalary)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="p-4 bg-slate-50 text-xs text-slate-500 text-center border-t">* 月報才加入一個月底薪及津貼；日報／年報顯示抽成與借支。薪資計算公式: (底薪 + 津貼) + (各類業績 x 抽成比率) - 借支 <br/>* 當前設定: {safeSettings.deductCostBeforeCommission ? '抽成前已扣除商品成本' : '以銷售全額計算抽成'}</div>
-                                </div>
-                                <div className="card overflow-hidden">
-                                    <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 flex items-center gap-2"><Table size={18}/> 設計師服務與商品項目次數</div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                                                <tr><th className="p-4 sticky left-0 bg-white min-w-[120px]">設計師</th>{categoryNames.map(c => <th key={c} className="p-4 text-center">{c}</th>)}<th className="p-4 text-center font-black bg-indigo-50/30">項目次數</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {categoryCountReport.map(s => (<tr key={s.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-bold text-slate-800 sticky left-0 bg-white border-r">{s.name}</td>{categoryNames.map(c => (<td key={c} className="p-4 text-center text-slate-600">{s.counts[c] > 0 ? <span className="bg-slate-100 px-2 py-1 rounded font-bold">{s.counts[c]}</span> : '-'}</td>))}<td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30">{s.totalCount}</td></tr>))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {view === 'salary' && (<div className="space-y-5"><div className="flex flex-wrap gap-3 items-center"><span className="text-sm">{lockedSalary?'本月薪資已鎖定':'依訂單計算 · 尚未鎖定'} · {reportMode==='month'?'含本月底薪與津貼':'此區間僅計抽成與借支'}</span>{reportMode==='month'&&(lockedSalary?<button className="btn btn-secondary" onClick={()=>confirmAction('解鎖本月薪資','解鎖後重新依訂單計算，確定？',()=>setSettings(p=>{const locks={...p.payrollLocks};delete locks[queryDate];return {...p,payrollLocks:locks};}))}>解鎖重新核對</button>:<button className="btn btn-secondary" onClick={lockPayroll}>鎖定本月薪資</button>)}</div><div className="salary-cards">{salaryReport.map(s=><article className="card salary-card" key={s.id}><header><span className="glass-icon"><User size={25}/></span><div><h3>{s.name}</h3><small>{s.role} · {s.visits??'—'} 客次</small></div><div className="salary-total"><small>{reportMode==='month'?'預估實領':'抽成減借支'}</small><strong>{formatCurrency(s.totalSalary)}</strong></div></header><div className="salary-pair"><div><small>虛業績</small><strong>{formatCurrency(s.serviceRevenue)}</strong></div><div><small>實業績</small><strong>{s.realRevenue===undefined?'舊結算未記錄':formatCurrency(s.realRevenue)}</strong></div></div><details><summary>薪資明細</summary><dl className="salary-lines">{[['服務抽成',s.serviceCommission],['商品抽成',s.productCommission],['協助收入',s.assistantCommission],['底薪＋津貼',s.fixedPay??(reportMode==='month'?Number(s.baseSalary||0)+Number(s.positionBonus||0)+Number(s.attendanceBonus||0):0)],['借支扣款',-s.advanceTotal],['商品營收',s.productRevenue],['服務材料',s.materialCost],['協助費扣除',s.assistantCost]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value===undefined?'舊結算未記錄':formatCurrency(value)}</dd></div>)}</dl><p className="text-xs text-slate-500">舊單沿用當時抽成方式；新單按實業績抽成，最低為零。</p></details></article>)}</div><details className="card p-5"><summary>服務與商品次數</summary>{categoryCountReport.map(s=><div key={s.id} className="py-3 border-b"><strong>{s.name} · {s.totalCount} 項</strong><div className="flex flex-wrap gap-2 mt-2">{categoryNames.filter(c=>s.counts[c]).map(c=><span className="preview-tag" key={c}>{c} {s.counts[c]}</span>)}</div></div>)}</details></div>)}
                         {view === 'expense' && (
                             <div className="space-y-6 animate-fade-in">
                                 <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
                                     <div className="font-bold text-slate-500">{reportMode==='year'?'本年':reportMode==='month'?'本月':'本日'}支出總計: <span className="text-2xl text-slate-800 ml-2">{formatCurrency(totalExpense)}</span></div>
                                     <button onClick={()=>setShowExpenseModal(true)} className="btn btn-primary"><Plus size={18}/> 新增支出</button>
                                 </div>
-                                <div className="card overflow-hidden">
+                                <div className="card overflow-x-auto expense-table">
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-slate-50 border-b"><tr><th className="p-4">日期</th><th className="p-4">項目</th><th className="p-4">說明</th><th className="p-4 text-right">金額</th><th className="p-4 text-center">操作</th></tr></thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -1865,7 +1795,7 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
                                     <div><label className="text-xs font-bold text-slate-500 mb-1 block">金額</label><input type="number" className="input-field text-lg font-bold" placeholder="0" value={newExpense.amount} onChange={e=>setNewExpense({...newExpense, amount: e.target.value})}/></div>
                                     <div><label className="text-xs font-bold text-slate-500 mb-1 block">備註說明</label><input className="input-field" placeholder="例如: 購買飲料、預支薪水..." value={newExpense.note} onChange={e=>setNewExpense({...newExpense, note: e.target.value})}/></div>
                                     {newExpense.type === '員工借支' && (<div className="bg-rose-50 p-3 rounded-lg border border-rose-100"><label className="text-xs font-bold text-rose-600 mb-1 block flex items-center gap-1"><User size={12}/> 借支人員 (將從薪資扣除)</label><select className="input-field border-rose-200 focus:border-rose-500" value={newExpense.staffId} onChange={e=>setNewExpense({...newExpense, staffId: e.target.value})}><option value="">請選擇人員</option>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>)}
-                                    <button onClick={addExpense} className="btn btn-primary w-full py-3 mt-2 shadow-lg">確認新增支出</button>
+                                    <button onClick={()=>runSave(addExpense)} className="btn btn-primary w-full py-3 mt-2 shadow-lg">確認新增支出</button>
                                 </div>
                             </Modal>
                         )}
@@ -1886,12 +1816,7 @@ const {safeTransactions,showToast,confirmAction,transactions,setTransactions,cus
     setDateMode(mode);
     const now = new Date();
     // 解決時區偏移問題的輔助函數
-    const getFormattedDate = (type) => {
-        const offset = now.getTimezoneOffset();
-        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
-        if (type === 'month') return localDate.toISOString().slice(0, 7); // YYYY-MM
-        return localDate.toISOString().slice(0, 10); // YYYY-MM-DD
-    };
+    const getFormattedDate = type => type==='month'?SalonStore.day(new Date()).slice(0,7):SalonStore.day(new Date());
 
     setQueryDate(getFormattedDate(mode));
 };
@@ -1920,10 +1845,10 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                 
                 return (
                     <div className="p-6 h-full overflow-y-auto">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <div className="page-heading mb-6">
                             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ClipboardList className="text-indigo-500"/> 查單管理系統</h2>
                             
-                            <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
+                            <div className="order-toolbar">
                                 <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-300">
                                     <button onClick={() => handleModeChange('month')} className={`px-3 py-1 text-sm rounded-md transition-colors ${dateMode==='month' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>月</button>
                                     <button onClick={() => handleModeChange('date')} className={`px-3 py-1 text-sm rounded-md transition-colors ${dateMode==='date' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>日</button>
@@ -1933,7 +1858,7 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                                     <option value="all">全體人員</option>
                                     {safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                 </select>
-<div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input type="text" className="input-field pl-10" placeholder="搜尋..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                            </div>
+<div className="search-field order-search"><Search size={18}/><input aria-label="搜尋單號或姓名" type="text" className="input-field" placeholder="搜尋單號或姓名" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div>                            </div>
                         </div>
 
                         {/* 卡片式列表區域 */}
@@ -2015,26 +1940,33 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                 );
             };
 
-function AppearanceSettings(){
+function AppearanceSettings({compact=false}){
  const {settings,setSettings,safeSettings,showToast}=React.useContext(SalonContext);
+ const [itemColors,setItemColors]=useState({});
  const [open,setOpen]=useState(false),[draft,setDraft]=useState({}),[colors,setColors]=useState({}),[editingCat,setEditingCat]=useState(''),[busy,setBusy]=useState(false),[payments,setPayments]=useState('');
  const panel=React.useRef(null),trigger=React.useRef(null);
- const presets=[['slate','霧白石墨','#526675','#eef2f4'],['warm','暖米茶棕','#806451','#f4eee6'],['blue','霧藍灰','#4e7088','#e8eff4'],['sage','鼠尾草綠','#577667','#eaf0e9']];
- const defaults={theme:'glass',palette:'slate',accent:'#526675',shape:'soft',textSize:'standard',weight:'normal',density:'comfortable',columns:3,effect:'light',motion:false};
- const launch=()=>{setDraft({...defaults,...settings.appearance});setColors({...safeSettings.categoryColors});setPayments((settings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).join('、'));setEditingCat('');setOpen(true);};
+ const presets=[['slate','霧白石墨','#526675','#eef2f4'],['warm','暖米茶棕','#806451','#f4eee6'],['blue','霧藍灰','#4e7088','#e8eff4'],['sage','鼠尾草綠','#577667','#eaf0e9'],['ink','深海墨藍','#254257','#dce5ed'],['rose','玫瑰石英','#8c5b70','#f5e9ed'],['amber','琥珀暖光','#906a36','#f5efdf'],['violet','暮紫煙霧','#706087','#ede9f5']];
+ const defaults={theme:'glass',palette:'slate',accent:'#526675',shape:'soft',textSize:'standard',weight:'normal',density:'comfortable',columns:3,effect:'blur',opacity:80,blur:16,tint:'#e5edf3',layout:'balanced',motion:false};
+ const launch=()=>{setDraft({...defaults,...settings.appearance});setColors({...safeSettings.categoryColors});setItemColors({...settings.itemColors});setPayments((settings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']).join('、'));setEditingCat('');setOpen(true);};
  useEffect(()=>{if(!open)return;const before=document.activeElement;panel.current?.focus();const onKey=e=>{if(e.key==='Escape'&&!busy)setOpen(false);if(e.key==='Tab'){const nodes=[...panel.current.querySelectorAll('button,input,select,summary,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length);if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===panel.current)){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener('keydown',onKey);return()=>{document.removeEventListener('keydown',onKey);before?.focus();};},[open,busy]);
  const change=(key,value)=>setDraft(p=>({...p,[key]:value}));
- const apply=async()=>{if(busy)return;const methods=[...new Set(payments.split(/[、,，\n]/).map(x=>x.trim()).filter(Boolean))];if(!methods.length){showToast('請至少保留一種付款方式','error');return;}setBusy(true);try{await setSettings(p=>({...p,appearance:draft,categoryColors:colors,paymentMethods:methods}));setOpen(false);showToast('外觀與操作設定已套用');}catch{}finally{setBusy(false);}};
- return <><div className="card appearance-intro p-6"><div><span className="eyebrow">YOUR SALON · YOUR STYLE</span><h3 className="font-bold text-xl mt-2">外觀與操作設定</h3><p className="text-sm text-slate-500 mt-2">柔霧層次、清楚標籤，讓每一次開單都順手。</p></div><div className="appearance-sample" aria-hidden="true"><span>剪髮</span><span>護髮</span><strong>專屬你的工作空間</strong></div><button ref={trigger} className="btn btn-primary" onClick={launch}>調整風格與版面</button></div>
+ const apply=async()=>{if(busy)return;const methods=[...new Set(payments.split(/[、,，\n]/).map(x=>x.trim()).filter(Boolean))];if(!methods.length){showToast('請至少保留一種付款方式','error');return;}setBusy(true);try{await setSettings(p=>({...p,appearance:draft,categoryColors:colors,itemColors,paymentMethods:methods}));setOpen(false);showToast('外觀與操作設定已套用');}catch{}finally{setBusy(false);}};
+ return <>{compact?<button className="btn btn-secondary style-shortcut" onClick={launch}><Settings size={18}/>調色與風格</button>:<div className="card appearance-intro p-6"><div><span className="eyebrow">YOUR SALON · YOUR STYLE</span><h3 className="font-bold text-xl mt-2">外觀與操作設定</h3><p className="text-sm text-slate-500 mt-2">柔霧層次、清楚標籤，讓每一次開單都順手。</p></div><div className="appearance-sample" aria-hidden="true"><span>剪髮</span><span>護髮</span><strong>專屬你的工作空間</strong></div><button ref={trigger} className="btn btn-primary" onClick={launch}>調整風格與版面</button></div>}
  {open&&<div className="style-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setOpen(false);}}><section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="style-title" className="style-drawer"><header className="style-header"><div><span className="eyebrow">APPEARANCE</span><h2 id="style-title" className="text-xl font-bold">打造你的工作空間</h2></div><button aria-label="關閉外觀設定" className="btn btn-secondary" disabled={busy} onClick={()=>setOpen(false)}><X size={20}/></button></header><div className="style-body space-y-6">
  <div className="style-preview" style={{background:presets.find(p=>p[0]===draft.palette)?.[3]||'#eef2f4',borderRadius:draft.shape==='square'?8:draft.shape==='pill'?28:18,fontSize:draft.textSize==='extra'?20:draft.textSize==='large'?18:16}}><span className="eyebrow">即時預覽</span><div className="flex gap-2 my-3"><span style={{background:(COLOR_THEMES[colors[safeSettings.categories[0]]]||COLOR_THEMES.slate).fill+'20',color:'#334155'}} className="preview-tag">{safeSettings.categories[0]||'剪髮'}</span><span className="preview-tag">護髮</span></div><div className="preview-service"><div><strong>精緻剪髮</strong><p className="text-sm text-slate-500">讓重要資訊一眼清楚</p></div><strong>$600</strong></div><button disabled className="preview-pay" style={{background:draft.accent,borderRadius:draft.shape==='square'?6:draft.shape==='pill'?28:12}}>確認收款</button></div>
  <div><h3 className="font-bold mb-3">選一套喜歡的配色</h3><div className="theme-options">{presets.map(([key,name,accent,bg])=><button key={key} aria-pressed={draft.palette===key} className={'theme-option '+(draft.palette===key?'selected':'')} onClick={()=>setDraft(p=>({...p,palette:key,accent,theme:'glass'}))}><div className="mini-scene" style={{background:bg}}><i style={{background:accent}}/><div><b/><b/></div></div><span>{name}</span>{draft.palette===key&&<span aria-hidden="true"> ✓</span>}</button>)}</div></div>
  <div className="grid grid-cols-2 gap-4"><label>文字大小<select className="input-field mt-2" value={draft.textSize} onChange={e=>change('textSize',e.target.value)}><option value="standard">標準</option><option value="large">大字</option><option value="extra">特大字</option></select></label><label>形狀<select className="input-field mt-2" value={draft.shape} onChange={e=>change('shape',e.target.value)}><option value="soft">柔和圓角</option><option value="pill">圓潤膠囊</option><option value="square">俐落小圓角</option></select></label><label>操作間距<select className="input-field mt-2" value={draft.density} onChange={e=>change('density',e.target.value)}><option value="comfortable">寬鬆好按</option><option value="compact">精簡</option></select></label><label>平板項目欄數<select className="input-field mt-2" value={draft.columns} onChange={e=>change('columns',Number(e.target.value))}>{[2,3,4].map(n=><option key={n} value={n}>{n} 欄</option>)}</select></label></div>
- <details className="style-disclosure"><summary>分類標籤配色 <span>點開後逐項調整</span></summary><div className="mt-3 space-y-2">{safeSettings.categories.map(cat=><div key={cat} className="category-setting"><button className="category-setting-row" onClick={()=>setEditingCat(editingCat===cat?'':cat)} aria-expanded={editingCat===cat}><span className="preview-tag" style={{background:(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).fill+'20'}}>{cat}</span><span className="text-sm text-slate-500">{(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).label} · 編輯</span></button>{editingCat===cat&&<div className="color-options">{Object.entries(COLOR_THEMES).map(([key,c])=><button key={key} aria-pressed={colors[cat]===key} onClick={()=>setColors(p=>({...p,[cat]:key}))}><span style={{background:c.fill+'22',borderColor:c.fill,color:'#334155'}}>{cat}</span><small>{c.label}{colors[cat]===key?' ✓':''}</small></button>)}</div>}</div>)}</div></details>
- <details className="style-disclosure"><summary>進階外觀與付款設定</summary><div className="grid grid-cols-2 gap-4 mt-4"><label>材質<select className="input-field mt-2" value={draft.theme} onChange={e=>change('theme',e.target.value)}><option value="glass">柔霧玻璃</option><option value="pearl">純淨白</option><option value="candy">柔和彩色</option></select></label><label>字體粗細<select className="input-field mt-2" value={draft.weight} onChange={e=>change('weight',e.target.value)}><option value="normal">標準</option><option value="bold">加強清晰</option></select></label><label>主色<input aria-label="自訂主色" type="color" className="input-field mt-2" value={draft.accent} onChange={e=>change('accent',e.target.value)}/></label><label>玻璃效果<select className="input-field mt-2" value={draft.effect} onChange={e=>change('effect',e.target.value)}><option value="light">輕量霧面（較順暢）</option><option value="blur">半透明模糊</option></select></label><label className="col-span-2 flex gap-2"><input type="checkbox" checked={draft.motion} onChange={e=>change('motion',e.target.checked)}/>啟用輕微過渡動畫</label><label className="col-span-2">付款方式（以「、」分隔，依輸入順序排列）<input className="input-field mt-2" value={payments} onChange={e=>setPayments(e.target.value)}/></label><button className="btn btn-secondary col-span-2" onClick={()=>{setDraft({...defaults});setColors({});}}>恢復預設外觀（套用後生效）</button></div></details>
+ <details className="style-disclosure"><summary>分類標籤配色 <span>點開後逐項調整</span></summary><div className="mt-3 space-y-2">{safeSettings.categories.map(cat=><div key={cat} className="category-setting"><button className="category-setting-row" onClick={()=>setEditingCat(editingCat===cat?'':cat)} aria-expanded={editingCat===cat}><span className="preview-tag" style={{background:(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).fill+'20'}}>{cat}</span><span className="text-sm text-slate-500">{colors[cat]?.startsWith('#')?'自訂色':(COLOR_THEMES[colors[cat]]||COLOR_THEMES.slate).label} · 編輯</span></button>{editingCat===cat&&<div><label className="custom-color-row">自選分類色<input aria-label={cat+'分類色'} type="color" value={tintColor(colors[cat])} onChange={e=>setColors(p=>({...p,[cat]:e.target.value}))}/></label><div className="color-options">{Object.entries(COLOR_THEMES).map(([key,c])=><button key={key} aria-pressed={colors[cat]===key} onClick={()=>setColors(p=>({...p,[cat]:key}))}><span style={{background:c.fill+'22',borderColor:c.fill,color:'#334155'}}>{cat}</span><small>{c.label}{colors[cat]===key?' ✓':''}</small></button>)}</div></div>}</div>)}</div></details>
+ <details className="style-disclosure"><summary>每張服務／商品卡片調色 <span>未自訂的項目會沿用分類色</span></summary>{SalonStore.all().services.filter(x=>!x.archived).map(item=><label className="custom-color-row" key={item.id}><span>{item.name}</span><input aria-label={item.name+'卡片顏色'} type="color" value={tintColor(itemColors[item.id]||colors[item.category])} onChange={e=>setItemColors(p=>({...p,[item.id]:e.target.value}))}/><button className="btn btn-secondary" onClick={()=>setItemColors(p=>{const n={...p};delete n[item.id];return n;})}>沿用分類</button></label>)}</details><details className="style-disclosure"><summary>進階外觀與付款設定</summary><div className="grid grid-cols-2 gap-4 mt-4"><label>材質<select className="input-field mt-2" value={draft.theme} onChange={e=>change('theme',e.target.value)}><option value="glass">柔霧玻璃</option><option value="liquid">透亮液態</option><option value="ink">深邃玻璃</option><option value="pearl">純淨白</option><option value="candy">柔和彩色</option></select></label><label>字體粗細<select className="input-field mt-2" value={draft.weight} onChange={e=>change('weight',e.target.value)}><option value="normal">標準</option><option value="bold">加強清晰</option></select></label><label>主色<input aria-label="自訂主色" type="color" className="input-field mt-2" value={draft.accent} onChange={e=>change('accent',e.target.value)}/></label><label>玻璃效果<select className="input-field mt-2" value={draft.effect} onChange={e=>change('effect',e.target.value)}><option value="light">輕量霧面（較順暢）</option><option value="blur">半透明模糊</option></select></label><label className="col-span-2">玻璃不透明度 {draft.opacity}%<input aria-label="玻璃不透明度" type="range" min="45" max="100" value={draft.opacity} onChange={e=>change('opacity',Number(e.target.value))}/></label><label>霧化 {draft.blur}px<input aria-label="玻璃霧化" type="range" min="0" max="24" value={draft.blur} onChange={e=>change('blur',Number(e.target.value))}/></label><label>背景色調<input aria-label="背景色調" type="color" className="input-field" value={draft.tint} onChange={e=>change('tint',e.target.value)}/></label><label className="col-span-2">平板開單比例<select className="input-field" value={draft.layout} onChange={e=>change('layout',e.target.value)}><option value="balanced">均衡 · 項目 60%／帳單 40%</option><option value="catalog">大項目 · 項目 68%／帳單 32%</option><option value="checkout">大帳單 · 各 50%</option></select></label><label className="col-span-2 flex gap-2"><input type="checkbox" checked={draft.motion} onChange={e=>change('motion',e.target.checked)}/>啟用輕微過渡動畫</label><label className="col-span-2">付款方式（以「、」分隔，依輸入順序排列）<input className="input-field mt-2" value={payments} onChange={e=>setPayments(e.target.value)}/></label><button className="btn btn-secondary col-span-2" onClick={()=>{setDraft({...defaults});setColors({});}}>恢復預設外觀（套用後生效）</button></div></details>
  </div><footer className="style-footer"><button className="btn btn-secondary" disabled={busy} onClick={()=>setOpen(false)}>取消</button><button className="btn btn-primary flex-1" disabled={busy} onClick={apply}>{busy?'儲存中…':'套用風格與設定'}</button></footer></section></div>}</>;
 }
-function ArchiveSettings(){const {settings,setSettings,showToast}=React.useContext(SalonContext);const [version,setVersion]=useState(0);const [fee,setFee]=useState(settings.assistantFee||0);const records=SalonStore.all();return <details className="card p-5"><summary className="font-bold cursor-pointer">進階管理 · 封存資料與助理計酬</summary><div className="space-y-4 mt-4"><label className="block">每項服務的助理費（元，0 表示不計；只影響新單）<input type="number" className="input-field mt-2" min="0" value={fee} onChange={e=>setFee(e.target.value)}/></label><button className="btn btn-secondary" onClick={async()=>{try{const n=SalonStore.money(fee);await setSettings(p=>({...p,assistantFee:n}));showToast('助理費已儲存');}catch(e){showToast(e.message,'error');}}}>儲存助理費</button><p className="text-sm text-slate-500">助理費另外列入人員薪資，不從主設計師抽成扣除。商品不計助理服務費。</p>{[['services','服務／商品'],['customers','顧客'],['stylists','人員'],['expenses','支出']].map(([key,label])=><details key={key}><summary>{label}封存紀錄（{records[key].filter(x=>x.archived).length}）</summary>{records[key].filter(x=>x.archived).slice(0,100).map(x=><div key={x.id} className="flex items-center justify-between border-b p-2 gap-3"><span>{x.name||x.Name||x.type} {x.date||''} {x.amount||''}</span><button className="btn btn-secondary text-sm" onClick={async()=>{try{await SalonStore.set(SalonStore.DATA[key],prev=>prev.map(r=>r.id===x.id?{...r,archived:false}:r));setVersion(n=>n+1);showToast('已恢復');}catch(e){showToast(e.message,'error');}}}>恢復</button></div>)}</details>)}</div></details>;}
+function tintColor(v){return /^#[0-9a-f]{6}$/i.test(v||'')?v:(COLOR_THEMES[v]||COLOR_THEMES.slate).fill;}
+function serviceTint(item,settings){const color=tintColor(settings.itemColors?.[item.id]||settings.categoryColors?.[item.category]);return {'--item-color':color,background:'linear-gradient(145deg,#ffffffed,'+color+'24)',borderColor:color+'55',boxShadow:'inset 0 1px 0 #fff,0 6px 18px -14px '+color};}
+function useWallet(){const subscribe=React.useCallback(fn=>SalonStore.subscribe(SalonStore.DATA.walletEntries,fn),[]);const fallback=React.useRef([]).current;return React.useSyncExternalStore(subscribe,()=>SalonStore.read(SalonStore.DATA.walletEntries,fallback));}
+function WalletSettings(){const {settings,showToast}=React.useContext(SalonContext);const [busy,setBusy]=useState(false);return <details className="card p-5"><summary>會員儲值 · 指定收銀裝置</summary><p className="text-sm my-3">儲值不是營業額。充值記入預收款，消費時才計營業額與抽成。為防止兩台離線重複花用，同一雲端空間只指定一台儲值收銀裝置；其他裝置只讀。更換裝置需管理者核對移交。</p><button className="btn btn-secondary" disabled={busy||!!settings.walletDeviceId} onClick={async()=>{if(!confirm('將此裝置指定為唯一儲值收銀裝置？請在店內主要平板操作。'))return;setBusy(true);try{await SalonStore.claimWalletDevice();showToast('已指定此裝置，可在顧客消費紀錄中儲值');}catch(e){showToast(e.message,'error');}finally{setBusy(false);}}}>{settings.walletDeviceId?'已設定儲值收銀裝置':'指定這台為儲值收銀裝置'}</button></details>;}
+function WalletPanel({customer}){const entries=useWallet(),{settings,showToast}=React.useContext(SalonContext),[amount,setAmount]=useState(''),[method,setMethod]=useState('現金'),[busy,setBusy]=useState(false);const token=React.useRef(crypto.randomUUID());if(!settings.walletDeviceId)return null;const canWrite=settings.walletDeviceId===SalonStore.walletOwnerId();return <details className="wallet-panel"><summary>儲值餘額 <strong>{formatCurrency(SalonStore.walletBalance(customer.id,entries))}</strong></summary><p className="text-sm my-3">{canWrite?'收到款項後登記充值；消費時選擇「儲值金」。':'此裝置僅供查看，請在指定平板儲值與扣款。'}</p>{canWrite&&<div className="wallet-form"><input aria-label="充值金額" className="input-field" type="number" min="1" placeholder="充值金額" value={amount} onChange={e=>setAmount(e.target.value)}/><select aria-label="儲值收款方式" className="input-field" value={method} onChange={e=>setMethod(e.target.value)}>{(settings.paymentMethods||['現金','信用卡','轉帳']).filter(x=>x!=='儲值金').map(x=><option key={x}>{x}</option>)}</select><button className="btn btn-primary" disabled={busy} onClick={async()=>{if(busy||!amount)return;if(!confirm('確認已收取 '+customer.name+' 的充值款 '+amount+' 元？'))return;setBusy(true);try{await SalonStore.walletTopup({id:token.current,customerId:customer.id,amount,paymentMethod:method});token.current=crypto.randomUUID();setAmount('');showToast('充值已記錄');}catch(e){showToast(e.message,'error');}finally{setBusy(false);}}}>收到款項並充值</button></div>}<div className="wallet-history">{entries.filter(e=>String(e.customerId)===String(customer.id)).slice().reverse().map(e=><div key={e.id}><span>{SalonStore.dateTime(e.date)} · {({topup:'充值',consume:'消費',refund:'作廢退回'})[e.kind]}</span><strong>{formatCurrency(e.amount)}</strong></div>)}</div></details>;}
+function WalletSummary({prefix,mode,end,revenue,expenses,tx}){const entries=useWallet();const selected=entries.filter(e=>{const d=SalonStore.day(e.date);return mode==='range'?d>=prefix&&d<=end:d.startsWith(prefix);});const topups=selected.filter(e=>e.kind==='topup').reduce((n,e)=>n+e.amount,0),used=tx.reduce((n,t)=>n+Number(t.walletPaid||0),0),balance=entries.reduce((n,e)=>n+Number(e.amount||0),0);return <p>本期儲值收款 {formatCurrency(topups)} · 儲值抵用 {formatCurrency(used)} · 尚未使用儲值總額 {formatCurrency(balance)}<br/>收款結餘試算 {formatCurrency(revenue-used+topups-expenses)}（不含未登記退款／應收款；與營業損益不同）</p>;}
+function ArchiveSettings(){const {settings,setSettings,showToast}=React.useContext(SalonContext);const [version,setVersion]=useState(0);const [fee,setFee]=useState(settings.assistantFee||0);const records=SalonStore.all();return <details className="card p-5"><summary className="font-bold cursor-pointer">進階管理 · 封存資料與助理計酬</summary><div className="space-y-4 mt-4"><label className="block">每項服務的助理費（元，0 表示不計；只影響新單）<input type="number" className="input-field mt-2" min="0" value={fee} onChange={e=>setFee(e.target.value)}/></label><button className="btn btn-secondary" onClick={async()=>{try{const n=SalonStore.money(fee);await setSettings(p=>({...p,assistantFee:n}));showToast('助理費已儲存');}catch(e){showToast(e.message,'error');}}}>儲存助理費</button><p className="text-sm text-slate-500">新單的助理費會從主設計師實業績扣除，並列入助理薪資；舊單計算保持原樣。商品不計助理服務費。</p>{[['services','服務／商品'],['customers','顧客'],['stylists','人員'],['expenses','支出']].map(([key,label])=><details key={key}><summary>{label}封存紀錄（{records[key].filter(x=>x.archived).length}）</summary>{records[key].filter(x=>x.archived).slice(0,100).map(x=><div key={x.id} className="flex items-center justify-between border-b p-2 gap-3"><span>{x.name||x.Name||x.type} {x.date||''} {x.amount||''}</span><button className="btn btn-secondary text-sm" onClick={async()=>{try{await SalonStore.set(SalonStore.DATA[key],prev=>prev.map(r=>r.id===x.id?{...r,archived:false}:r));setVersion(n=>n+1);showToast('已恢復');}catch(e){showToast(e.message,'error');}}}>恢復</button></div>)}</details>)}</div></details>;}
 function downloadJSON(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function RecoveryFailure(){return <div className="p-6 space-y-4"><h1>資料復原尚未完成，請保留本機資料</h1><button className="btn btn-primary" onClick={()=>downloadJSON(Object.fromEntries([...Object.values(SalonStore.DATA),SalonStore.DRAFT,window.AetherPosBridge.PREFIX+'journal'].map(k=>[k,localStorage.getItem(k)])),'salon_raw_recovery.json')}>下載原始資料供修復</button></div>;}
 class PosErrorBoundary extends React.Component {constructor(props){super(props);this.state={error:null};}static getDerivedStateFromError(error){return {error};}render(){if(this.state.error)return <div className="p-6 max-w-lg mx-auto space-y-4"><h1 className="text-xl font-bold">資料讀取需要修復</h1><p>原資料仍保留，請先下載原始資料，再聯絡管理者；不要重置系統。</p><button className="btn btn-primary" onClick={()=>downloadJSON(Object.fromEntries([...Object.values(SalonStore.DATA),SalonStore.DRAFT,window.AetherPosBridge.PREFIX+'journal'].map(k=>[k,localStorage.getItem(k)])),'salon_raw_recovery.json')}>下載原始資料</button></div>;return this.props.children;}}

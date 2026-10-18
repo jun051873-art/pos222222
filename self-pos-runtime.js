@@ -2,12 +2,12 @@
 (function(root){
 'use strict';
 const PREFIX='pos222222:', B=root.AetherPosBridge,codec=root.SalonStorageCodec||JSON;
-const DATA={services:'salon_services',stylists:'salon_stylists',customers:'salon_customers',transactions:'salon_transactions',inventoryLogs:'salon_inventory_logs',expenses:'salon_expenses',settings:'salon_settings',pendingOrders:'salon_pending_orders'};
+const DATA={services:'salon_services',stylists:'salon_stylists',customers:'salon_customers',transactions:'salon_transactions',inventoryLogs:'salon_inventory_logs',expenses:'salon_expenses',settings:'salon_settings',pendingOrders:'salon_pending_orders',walletEntries:'salon_wallet_entries'};
 const DRAFT=PREFIX+'draft', cache=new Map(), listeners=new Map(),downloadVersions=new WeakMap();
-let sequence=Promise.resolve(), revision=0, cloudBusy=false, cloudTimer, cloudState={state:'idle',message:'本機資料保存；雲端尚未檢查'};
+let sequence=Promise.resolve(), revision=0, cloudBusy=false, syncBusy=false, syncApplying=false, cloudTimer, cloudState={state:'idle',message:'本機資料保存；雲端尚未檢查'};
 const emit=key=>{for(const f of listeners.get(key)||[])f();};
 function read(key,fallback){const raw=localStorage.getItem(key);const old=cache.get(key);if(old&&old.raw===raw)return old.value;let value=raw===null?fallback:codec.parse(raw);cache.set(key,{raw,value});return value;}
-function publish(keys){for(const key of keys){cache.delete(key);emit(key);}if(keys.some(k=>Object.values(DATA).includes(k))){revision++;root.dispatchEvent(new Event('pos-data-saved'));scheduleCloud();}}
+function publish(keys){for(const key of keys){cache.delete(key);emit(key);}if(keys.some(k=>Object.values(DATA).includes(k))){revision++;root.dispatchEvent(new Event('pos-data-saved'));if(!syncApplying)scheduleCloud();}}
 function subscribe(key,fn){if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);return()=>listeners.get(key).delete(fn);}
 function customerRecord(c){return {...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:Number(c.visits??c.Visits??0),totalSpend:Number(c.totalSpend??c.TotalSpend??0)};}
 function all(){return Object.fromEntries(Object.entries(DATA).map(([name,key])=>[name,read(key,name==='settings'?{}:[])]));}
@@ -39,16 +39,17 @@ async function checkout(input){return transaction(d=>{
  const existing=d.transactions.find(t=>t.id===input.id);if(existing){const lines=items=>JSON.stringify(items.map(i=>[String(i.id),Number(i.price),Number(i.discount||0),String(i.stylistId)]));if(lines(existing.items)!==lines(input.items)||String(existing.customerId||'')!==String(input.customerId||'')||existing.paymentMethod!==input.paymentMethod||dateTime(existing.date)!==dateTime(input.date.length===16?input.date+':00+08:00':input.date))throw Error('此草稿已在另一個分頁完成，內容與目前畫面不同；請先查單，未重複入帳');return existing;}
  if(!input.items.length)throw Error('請先加入服務或商品');if(!input.stylistId)throw Error('請選擇設計師');
  d.customers=d.customers.map(customerRecord);const st=d.stylists.find(s=>!s.archived&&String(s.id)===String(input.stylistId));if(!st)throw Error('設計師資料已變更，請重新選擇');
- const settings=d.settings;const items=input.items.map(i=>{const price=money(i.price),discount=money(i.discount||0);money(i.cost||0);if(discount>price)throw Error('折扣不能大於售價');const person=d.stylists.find(s=>!s.archived&&String(s.id)===String(i.stylistId));if(!person)throw Error('項目設計師已停用或刪除，請重新選擇');const rate=person.useGlobalCommission?Number(settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0);if(!Number.isFinite(rate)||rate<0||rate>100)throw Error('抽成比例需在0至100之間，請先核對人員或分類設定');return {...i,price,discount,stylistId:person.id,stylistName:person.name,commissionRate:rate,assistantFee:i.assistantId&&!i.isProduct&&String(i.assistantId)!==String(i.stylistId)?money(settings.assistantFee||0):0,deductCost:!!settings.deductCostBeforeCommission};});
+ const settings=d.settings;const items=input.items.map(i=>{const price=money(i.price),discount=money(i.discount||0);money(i.cost||0);if(discount>price)throw Error('折扣不能大於售價');const person=d.stylists.find(s=>!s.archived&&String(s.id)===String(i.stylistId));if(!person)throw Error('項目設計師已停用或刪除，請重新選擇');const rate=person.useGlobalCommission?Number(settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0);if(!Number.isFinite(rate)||rate<0||rate>100)throw Error('抽成比例需在0至100之間，請先核對人員或分類設定');return {...i,price,discount,stylistId:person.id,stylistName:person.name,commissionRate:rate,commissionModel:'net-v2',assistantFee:i.assistantId&&!i.isProduct&&String(i.assistantId)!==String(i.stylistId)?money(settings.assistantFee||0):0,deductCost:!!settings.deductCostBeforeCommission};});
  const needed={};for(const i of items)if(i.isProduct)needed[i.id]=(needed[i.id]||0)+1;
  const services=d.services.map(s=>{if(!needed[s.id])return s;if(s.archived)throw Error('商品已停用，請移除後重新選擇');const stock=Number(s.stock);if(!Number.isInteger(stock)||stock<needed[s.id])throw Error(s.name+'庫存不足，請重新核對');delete needed[s.id];return {...s,stock:stock-items.filter(i=>i.isProduct&&String(i.id)===String(s.id)).length};});
  if(Object.keys(needed).length)throw Error('有商品已刪除，請重新核對');
  const customer=input.customerId?d.customers.find(c=>!c.archived&&String(c.id)===String(input.customerId)):null;if(input.customerId&&!customer)throw Error('顧客資料已變更，請重新選擇');
  if(!dateTime(input.date))throw Error('請填寫正確日期');
  const order={id:input.id,date:input.date.length===16?input.date+':00+08:00':input.date,createdAt:new Date().toISOString(),items,total:Math.round(items.reduce((n,i)=>n+itemAmount(i),0)*100)/100,paymentMethod:input.paymentMethod,mainStylistId:st.id,customerId:customer?.id||null,customerName:customer?.name||input.customerName||'散客',customerGender:customer?.gender||input.gender||'未填寫'};
+ let walletEntries=d.walletEntries;if(input.paymentMethod==='儲值金'){requireWalletOwner(d.settings);if(!customer)throw Error('儲值扣款請先選擇會員');if(walletBalance(customer.id,d.walletEntries)<order.total)throw Error('儲值餘額不足，未完成結帳');order.walletPaid=order.total;walletEntries=[...d.walletEntries,{id:'debit:'+order.id,customerId:customer.id,date:order.createdAt,amount:-order.total,kind:'consume',orderId:order.id}];}
  const tx=[order,...d.transactions];const logs=items.filter(i=>i.isProduct).map(i=>({id:id(),date:order.date,type:'銷售',itemId:i.id,itemName:i.name,qty:1,cost:i.cost,note:'訂單 #'+order.id.slice(0,8),operator:st.name}));
  const customers=customer?d.customers.map(c=>c.id===customer.id?{...c,visits:Number(c.visits||0)+1,totalSpend:money(Number(c.totalSpend||0)+order.total)}:c):d.customers;
- atomic({salon_transactions:tx,salon_services:services,salon_customers:customers,salon_inventory_logs:[...logs,...d.inventoryLogs],salon_pending_orders:d.pendingOrders.filter(o=>o.id!==input.pendingId),[DRAFT]:null});return order;
+ atomic({salon_wallet_entries:walletEntries,salon_transactions:tx,salon_services:services,salon_customers:customers,salon_inventory_logs:[...logs,...d.inventoryLogs],salon_pending_orders:d.pendingOrders.filter(o=>o.id!==input.pendingId),[DRAFT]:null});return order;
 });}
 async function savePending(draft,note,pendingId){return transaction(d=>{const existing=d.pendingOrders.find(o=>o.id===pendingId);const p={...draft,id:existing?.id||id(),time:existing?.time||new Date().toISOString(),note,custName:draft.selectedCustomer?.name||draft.adHocCustomerName||'散客'};atomic({salon_pending_orders:[...d.pendingOrders.filter(o=>o.id!==p.id),p],[DRAFT]:null});return p;});}
 async function inventory(input){return transaction(d=>{
@@ -62,6 +63,7 @@ async function inventory(input){return transaction(d=>{
  atomic({salon_services:d.services.map(s=>s.id===product.id?{...s,stock,cost}:s),salon_inventory_logs:[log,...d.inventoryLogs],...(expense?{salon_expenses:[...d.expenses,expense]}:{})});
 });}
 async function reviseOrder(updated,remove=false){return transaction(d=>{const old=d.transactions.find(t=>t.id===updated.id);if(!old)throw Error('找不到原單');if(old.voided)throw Error('此單已作廢，不能重複處理');d.customers=d.customers.map(customerRecord);if(old.sourceAppointment)throw Error('轉入單請先核對來源再更正');
+ if(old.walletPaid&&!remove)throw Error('儲值付款單請先作廢退回餘額，再重新開單，避免金額不一致');if(old.walletPaid)requireWalletOwner(d.settings);
  if(updated.expectedVersion&&updated.expectedVersion!==JSON.stringify(old))throw Error('這筆單據已在其他分頁修改，請重新開啟原單');
  const items=remove?[]:updated.items.map((i,index)=>{money(i.price);money(i.discount||0);if(itemAmount(i)<0)throw Error('折扣不能超過售價');const person=d.stylists.find(s=>String(s.id)===String(String(old.mainStylistId)!==String(updated.mainStylistId)?updated.mainStylistId:i.stylistId));if(!person)throw Error('請選擇有效設計師');return {...i,stylistId:person.id,stylistName:person.name,commissionRate:String(person.id)===String((old.items.find(o=>i.cartId&&o.cartId===i.cartId)||old.items[index]||i).stylistId)?i.commissionRate:(person.useGlobalCommission?Number(d.settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0))};});
  if(!remove&&!items.length)throw Error('訂單至少保留一個項目；取消整單請使用作廢');
@@ -71,26 +73,29 @@ async function reviseOrder(updated,remove=false){return transaction(d=>{const ol
  const {expectedVersion,...fields}=updated;const order={...fields,mainStylistId:updated.mainStylistId,items,total:Math.round(items.reduce((n,i)=>n+itemAmount(i),0)*100)/100};const tx=d.transactions.map(t=>t.id!==old.id?t:remove?{...old,voided:true,voidReason:updated.voidReason||'取消交易',voidedAt:new Date().toISOString(),history:[...(old.history||[]),{at:new Date().toISOString(),action:'作廢',total:old.total}]}:{...order,history:[...(old.history||[]),{at:new Date().toISOString(),action:'修改',before:{...old,history:undefined}}]});
  const customers=d.customers.map(c=>{let visits=Number(c.visits||0),total=Number(c.totalSpend||0);if(c.id===old.customerId){visits--;total-=Number(old.total||0);}if(!remove&&c.id===order.customerId){visits++;total+=order.total;}return {...c,visits:Math.max(0,visits),totalSpend:Math.max(0,Math.round(total*100)/100)};});
  const logs=Object.entries(delta).filter(([,q])=>q).map(([key,q])=>({id:id(),date:new Date().toISOString(),type:q>0?'退單回補':'訂單更正',itemId:key,itemName:d.services.find(s=>String(s.id)===key)?.name,qty:Math.abs(q),note:'訂單 #'+old.id.slice(0,8),operator:'訂單管理'}));
- atomic({salon_transactions:tx,salon_customers:customers,salon_services:services,salon_inventory_logs:[...logs,...d.inventoryLogs],[PREFIX+'last-order-change']:{before:old,at:new Date().toISOString(),removed:remove}});return order;
+ atomic({...(old.walletPaid?{salon_wallet_entries:[...d.walletEntries,{id:'refund:'+old.id,customerId:old.customerId,date:new Date().toISOString(),amount:old.walletPaid,kind:'refund',orderId:old.id}]}:{}),salon_transactions:tx,salon_customers:customers,salon_services:services,salon_inventory_logs:[...logs,...d.inventoryLogs],[PREFIX+'last-order-change']:{before:old,at:new Date().toISOString(),removed:remove}});return order;
 });}
 function backupPayload(){return {...all(),draft:draftRead(),lastUpdated:new Date().toISOString(),format:'salon-pos-backup-v2'};}
 function validateBackup(data){
  if(!data||typeof data.settings!=='object'||Array.isArray(data.settings)||!data.settings)throw Error('不是完整的 POS 備份，未覆蓋任何資料');
  for(const key of ['transactions','customers','services','stylists'])if(!Array.isArray(data[key]))throw Error('備份缺少 '+key+'，未覆蓋任何資料');
- for(const key of ['transactions','customers','services','stylists','expenses','inventoryLogs','pendingOrders']){if(data[key]!==undefined&&!Array.isArray(data[key]))throw Error(key+'資料格式錯誤');const ids=new Set();for(const row of data[key]||[]){if(!row||row.id===undefined||row.id===null||String(row.id)===''||ids.has(String(row.id)))throw Error(key+' 包含缺少或重複的識別碼');ids.add(String(row.id));}}
+ for(const key of ['transactions','customers','services','stylists','expenses','inventoryLogs','pendingOrders','walletEntries']){if(data[key]!==undefined&&!Array.isArray(data[key]))throw Error(key+'資料格式錯誤');const ids=new Set();for(const row of data[key]||[]){if(!row||row.id===undefined||row.id===null||String(row.id)===''||ids.has(String(row.id)))throw Error(key+' 包含缺少或重複的識別碼');ids.add(String(row.id));}}
+ for(const e of data.walletEntries||[]){if(!e.customerId||!Number.isFinite(Number(e.amount))||!['topup','consume','refund'].includes(e.kind)||!dateTime(e.date))throw Error('儲值紀錄不完整');}
  for(const c of data.customers){if(typeof(c.name||c.Name)!=='string'||!(c.name||c.Name).trim())throw Error('備份包含不完整顧客資料');const n=customerRecord(c);money(n.totalSpend);if(!Number.isInteger(n.visits)||n.visits<0)throw Error('顧客累積次數格式錯誤');}
  for(const t of data.transactions){if(!dateTime(t.date)||!Array.isArray(t.items)||!t.items.length)throw Error('備份訂單缺少日期或明細，未覆蓋任何資料');money(t.total);for(const i of t.items){if(!i||!Number.isFinite(Number(i.price)))throw Error('訂單明細金額不完整');if(itemAmount(i)<0)throw Error('訂單折扣超過售價');money(i.cost||0);}}
  for(const e of data.expenses||[]){money(e.amount);if(!dateTime(e.date))throw Error('支出日期不完整');}
  return data;
 }
 async function restore(data){validateBackup(data);return transaction(()=>{
+ const existingWallet=all().walletEntries;for(const entry of existingWallet){if(!(data.walletEntries||[]).some(e=>e.id===entry.id&&equivalent(e,entry)))throw Error('此備份缺少已發生的儲值紀錄，為防止重複花用，禁止還原。請使用包含最新儲值紀錄的完整備份');}
  // Compact only this POS's existing values, replacing each with equivalent data.
  // This also reclaims oversized snapshots left by a previous failed restore.
  for(const key of [...Object.values(DATA),DRAFT,PREFIX+'before-restore']){const raw=localStorage.getItem(key);if(raw){const packed=codec.stringify(codec.parse(raw));if(packed.length<raw.length)localStorage.setItem(key,packed);}}
  const after={[PREFIX+'before-restore']:backupPayload()};for(const [name,key]of Object.entries(DATA))after[key]=data[name]??(name==='settings'?{}:[]);after[DATA.customers]=data.customers.map(customerRecord);after[DRAFT]=data.draft||null;
  // Restoring another device's preferences must not enable uploads from this device.
  const downloaded=downloadVersions.get(data);
- after[DATA.settings]={...after[DATA.settings],...(downloaded?.settings||{}),autoCloudBackup:false};
+ after[DATA.settings]={...after[DATA.settings],...(downloaded?.settings||{}),autoCloudBackup:false,autoSync:false};
+ if(downloaded)after[syncBaseKey(downloaded.settings)]=data;
  if(downloaded)after[cloudMetaKey(downloaded.settings)]={at:new Date().toISOString(),updateTime:downloaded.updateTime,confirmed:true,versionId:downloaded.versionId};
  atomic(after);
  }).catch(e=>{if(e.name==='QuotaExceededError')throw Error('手機／瀏覽器本機儲存空間不足，還原未完成；請先下載本機備份，不要重置或清除網站資料。');throw e;});}
@@ -99,7 +104,7 @@ function status(state,message,extra={}){cloudState={state,message,...extra};emit
 function cloudURL(settings){if(!settings.shopID?.trim()||!settings.syncToken?.trim())throw Error('請先設定店號與同步金鑰');return 'https://firestore.googleapis.com/v1/projects/salonpos-system/databases/(default)/documents/SalonPOS/'+encodeURIComponent(settings.shopID.trim())+'/Tokens/'+encodeURIComponent(settings.syncToken.trim());}
 function cloudMetaKey(settings){return PREFIX+'cloud:'+settings.shopID.trim()+':'+settings.syncToken.trim();}
 function protectCloud(local,remote){
- for(const [key,label]of Object.entries({transactions:'訂單',customers:'顧客',expenses:'支出',inventoryLogs:'庫存紀錄',services:'服務與商品',stylists:'人員'})){
+ for(const [key,label]of Object.entries({transactions:'訂單',customers:'顧客',expenses:'支出',inventoryLogs:'庫存紀錄',walletEntries:'儲值紀錄',services:'服務與商品',stylists:'人員'})){
   const here=local[key]||[],there=remote[key]||[];
   if(here.length<there.length)throw Error('防誤覆蓋：本機'+label+' '+here.length+' 筆，少於雲端 '+there.length+' 筆，已停止上傳。請先下載恢復雲端資料');
   const ids=new Set(here.filter(r=>r?.id!==undefined&&r.id!==null).map(r=>String(r.id)));
@@ -133,10 +138,10 @@ async function packCloud(payload){
 // Version documents are create-only. Never PATCH or DELETE the legacy document.
 async function cloudVersions(settings){
  const base=cloudURL(settings),result=[];let token='';const seen=new Set();
- do{const r=await cloudFetch(base+'/Backups?pageSize=100&mask.fieldPaths=parentVersion&mask.fieldPaths=kind'+(token?'&pageToken='+encodeURIComponent(token):''),{cache:'no-store'});
+ do{const r=await cloudFetch(base+'/Backups?pageSize=100&mask.fieldPaths=parentVersion&mask.fieldPaths=kind&mask.fieldPaths=mergedVersions'+(token?'&pageToken='+encodeURIComponent(token):''),{cache:'no-store'});
  if(r.status===403)throw Error('雲端版本備份權限尚未開通，已停止操作；不會改用覆蓋舊備份。請管理者設定 Backups 的讀取與新增權限');
  const page=await responseJSON(r);if(!Array.isArray(page.documents)&&page.documents!==undefined)throw Error('版本清單格式異常，已停止操作');
- for(const doc of page.documents||[]){if(!doc.name||!doc.createTime||!doc.updateTime)throw Error('版本清單缺少時間，已停止操作');result.push({...doc,versionId:doc.name.split('/').pop()});}
+ for(const doc of page.documents||[]){if(doc.name?.endsWith('/wallet-owner-v1'))continue;if(!doc.name||!doc.createTime||!doc.updateTime)throw Error('版本清單缺少時間，已停止操作');result.push({...doc,versionId:doc.name.split('/').pop()});}
  token=page.nextPageToken||'';if(token&&seen.has(token))throw Error('版本清單讀取不完整，已停止操作');seen.add(token);
  }while(token);
  return result.sort((a,b)=>b.createTime.localeCompare(a.createTime)||b.name.localeCompare(a.name));
@@ -151,10 +156,10 @@ async function cloudHead(settings){
  if(document.updateTime!==latest.updateTime)throw Error('備份版本在讀取時發生變更，已停止操作');
  return {document,versionId:latest.versionId,versions};
 }
-async function cloudBackup(settings,manual=false){if(cloudBusy)throw Error('雲端備份處理中，請稍候');clearTimeout(cloudTimer);const startRevision=revision;cloudBusy=true;status('saving','雲端備份中，本機可繼續開單');try{
+async function cloudBackup(settings,manual=false,mergeParents=[]){if(cloudBusy)throw Error('雲端備份處理中，請稍候');clearTimeout(cloudTimer);const startRevision=revision;cloudBusy=true;status('saving','雲端備份中，本機可繼續開單');try{
  const url=cloudURL(settings),metaKey=cloudMetaKey(settings);const meta=read(metaKey,{});
  if(!manual&&(!meta.updateTime||meta.confirmed===false))throw Error('請先手動完成一次雲端備份，再開啟自動備份');
- const head=await cloudHead(settings),current=head.document;
+ const head=await cloudHead(settings),current=head.document;if(versionTips(head.versions).length>1&&!mergeParents.length)throw Error('多台裝置有不同的新版本，請使用安全同步合併；所有版本仍保留');
  if(current&&meta.updateTime&&current.updateTime!==meta.updateTime)throw Error('雲端已被其他裝置更新，請先核對，未覆蓋備份');
  if(!manual&&current&&!meta.updateTime)throw Error('請先核對既有雲端資料');
  const payload=backupPayload();payload.settings={...payload.settings,...settings};if(current)protectCloud(payload,await unpackCloud(current.fields?.content?.stringValue));const {content,rawBytes,storedBytes}=await packCloud(payload);
@@ -166,15 +171,15 @@ async function cloudBackup(settings,manual=false){if(cloudBusy)throw Error('雲�
  const archived=await responseJSON(await cloudFetch(archiveURL,{cache:'no-store'}));
  if(archived.fields?.content?.stringValue!==current.fields?.content?.stringValue)throw Error('原始備份保留副本與目前內容不同，已停止新增；既有資料未覆寫');
  }
- const versionId=id(),versionURL=url+'/Backups/'+encodeURIComponent(versionId);const precondition='&currentDocument.exists=false';
- const saved=await responseJSON(await cloudFetch(versionURL+'?updateMask.fieldPaths=content&updateMask.fieldPaths=parentVersion'+precondition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{content:{stringValue:content},parentVersion:{stringValue:current?head.versionId+':'+current.updateTime:'none'}}})}));
+ const versionId='v-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+id(),versionURL=url+'/Backups/'+encodeURIComponent(versionId);const precondition='&currentDocument.exists=false';
+ const saved=await responseJSON(await cloudFetch(versionURL+'?updateMask.fieldPaths=content&updateMask.fieldPaths=parentVersion&updateMask.fieldPaths=mergedVersions'+precondition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{mergedVersions:{arrayValue:{values:mergeParents.map(stringValue=>({stringValue}))}},content:{stringValue:content},parentVersion:{stringValue:current?head.versionId+':'+current.updateTime:'none'}}})}));
  if(saved.fields?.content?.stringValue!==content)throw Error('雲端回傳內容不符，尚未確認備份成功');
  // Keep the write receipt if the verification GET fails, so a manual retry can
  // safely compare against our own write without disabling conflict detection.
  if(!saved.updateTime)throw Error('雲端未提供備份版本，尚未確認成功');
  localStorage.setItem(metaKey,JSON.stringify({updateTime:saved.updateTime,versionId,confirmed:false}));
  const checked=await responseJSON(await cloudFetch(versionURL,{cache:'no-store'}));if(checked.updateTime!==saved.updateTime||checked.fields?.content?.stringValue!==content)throw Error('上傳後的雲端讀回核對不符，請核對其他裝置，尚未確認備份成功');await unpackCloud(checked.fields.content.stringValue);
- const at=new Date().toISOString();localStorage.setItem(metaKey,JSON.stringify({at,updateTime:saved.updateTime,versionId,confirmed:true}));const sizeInfo=rawBytes>storedBytes?'（'+Math.ceil(rawBytes/1024)+' → '+Math.ceil(storedBytes/1024)+' KB）':'';status('saved','雲端新版本已保存，舊版本保留'+sizeInfo+' · '+dateTime(at).replace('T',' '),{at,rawBytes,storedBytes});return saved;
+ const at=new Date().toISOString();atomic({[syncBaseKey(settings)]:payload,[metaKey]:{at,updateTime:saved.updateTime,versionId,confirmed:true}});const sizeInfo=rawBytes>storedBytes?'（'+Math.ceil(rawBytes/1024)+' → '+Math.ceil(storedBytes/1024)+' KB）':'';status('saved','雲端新版本已保存，舊版本保留'+sizeInfo+' · '+dateTime(at).replace('T',' '),{at,rawBytes,storedBytes});return saved;
  }catch(e){status('error',e.message);throw e;}finally{cloudBusy=false;if(revision!==startRevision&&read(DATA.settings,{}).autoCloudBackup)scheduleCloud();}}
 async function cloudDownload(settings,versionId){
  const head=await cloudHead(settings);let document=head.document,selected=head.versionId;
@@ -183,9 +188,82 @@ async function cloudDownload(settings,versionId){
  downloadVersions.set(data,{settings:{shopID:settings.shopID.trim(),syncToken:settings.syncToken.trim()},updateTime:document.updateTime,versionId:selected});return data;
 }
 
-function scheduleCloud(){clearTimeout(cloudTimer);const settings=read(DATA.settings,{});if(!settings.autoCloudBackup){status('pending','資料已存本機；雲端需手動備份');return;}status('pending','資料已存本機，等待背景備份');cloudTimer=setTimeout(()=>cloudBackup(read(DATA.settings,{})).catch(()=>{}),4000);}
+// Three-way merge: a conflicting edit is never resolved by timestamp alone.
+const equivalent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const deviceKeys=['autoSync','autoCloudBackup','autoBackup','shopID','syncToken'];
+function mergeValue(base,local,remote,path){
+ if(equivalent(local,remote))return local;if(equivalent(local,base))return remote;if(equivalent(remote,base))return local;
+ if(base&&local&&remote&&![base,local,remote].some(Array.isArray)&&[base,local,remote].every(x=>typeof x==='object')){const out={};for(const k of new Set([...Object.keys(base),...Object.keys(local),...Object.keys(remote)]))out[k]=mergeValue(base[k],local[k],remote[k],path+'.'+k);return out;}
+ throw Error('同步暫停：'+path+' 在兩台裝置都被修改。兩邊資料及雲端版本仍保留，請先核對；未以新資料蓋掉舊資料');
+}
+function mergeData(base,local,remote){
+ const out={...remote};
+ for(const key of Object.keys(DATA).filter(k=>k!=='settings')){
+ const b=new Map((base?.[key]||[]).map(r=>[String(r.id),r])),l=new Map((local[key]||[]).map(r=>[String(r.id),r])),r=new Map((remote[key]||[]).map(r=>[String(r.id),r]));out[key]=[];
+ for(const k of new Set([...r.keys(),...l.keys(),...b.keys()])){let bv=b.get(k),lv=l.get(k),rv=r.get(k),v;if(key==='customers'){if(bv)bv=customerRecord(bv);if(lv)lv=customerRecord(lv);if(rv)rv=customerRecord(rv);}
+ if(key==='services'&&bv?.isProduct&&lv&&rv&&lv.stock!==bv.stock&&rv.stock!==bv.stock&&!equivalent(local.transactions,remote.transactions))throw Error('同步暫停：同一商品在兩台裝置異動庫存，請核對');
+ if(equivalent(lv,rv)){v=lv;}else if(!bv){if(lv&&rv&&!equivalent(lv,rv))throw Error('同步暫停：'+key+' 有同一識別碼的不同內容，請先核對');v=lv||rv;}
+ else if(key==='customers'&&lv&&rv){const counts={};for(const f of ['visits','totalSpend']){const aliases={visits:'Visits',totalSpend:'TotalSpend'};counts[f]=Math.round((Number(lv[f]??lv[aliases[f]]??0)+Number(rv[f]??rv[aliases[f]]??0)-Number(bv[f]??bv[aliases[f]]??0))*100)/100;}
+ const strip=x=>Object.fromEntries(Object.entries(customerRecord(x)).filter(([f])=>!['visits','totalSpend','Visits','TotalSpend'].includes(f)));v={...mergeValue(strip(bv),strip(lv),strip(rv),key+'.'+k),...counts};}
+ else if(['transactions','walletEntries','services'].includes(key)&&lv&&rv&&!equivalent(lv,rv)&&!equivalent(lv,bv)&&!equivalent(rv,bv))throw Error('同步暫停：同一筆單據、庫存或儲值有雙方修改，請核對後再同步');
+ else v=mergeValue(bv,lv,rv,key+'.'+k);
+ if(v)out[key].push(v);else if(key!=='pendingOrders'&&bv)throw Error('同步暫停：不允許移除既有紀錄，請使用封存或作廢');
+ }
+ }
+ if(base){const totals=tx=>{const map=new Map();for(const t of tx||[]){if(t.voided||!t.customerId)continue;const k=String(t.customerId),v=map.get(k)||{visits:0,totalSpend:0};v.visits++;v.totalSpend+=Number(t.total||0);map.set(k,v);}return map;},before=totals(base.transactions),after=totals(out.transactions),byCustomer=new Map((base.customers||[]).map(c=>[String(c.id),customerRecord(c)]));out.customers=out.customers.map(c=>{const original=byCustomer.get(String(c.id));if(!original)return c;const old=before.get(String(c.id))||{visits:0,totalSpend:0},next=after.get(String(c.id))||{visits:0,totalSpend:0};return {...c,visits:original.visits+next.visits-old.visits,totalSpend:Math.round((original.totalSpend+next.totalSpend-old.totalSpend)*100)/100};});}
+ const strip=x=>Object.fromEntries(Object.entries(x||{}).filter(([k])=>!deviceKeys.includes(k)));
+ out.settings=base?mergeValue(strip(base.settings),strip(local.settings),strip(remote.settings),'設定'):{...strip(remote.settings)};
+ for(const k of deviceKeys)if(local.settings[k]!==undefined)out.settings[k]=local.settings[k];
+ out.draft=local.draft;validateBackup(out);return out;
+}
+function versionTips(versions){const consumed=new Set();for(const v of versions){const p=v.fields?.parentVersion?.stringValue;if(p)consumed.add(p.split(':')[0]);for(const a of v.fields?.mergedVersions?.arrayValue?.values||[])consumed.add(a.stringValue);}return versions.filter(v=>v.fields?.kind?.stringValue!=='legacy-snapshot'&&!consumed.has(v.versionId));}
+let lastProbe='',lastProbeScope='',lastFullCheck=0,lastSyncRevision=-1;
+async function cloudProbe(settings){const r=await responseJSON(await cloudFetch(cloudURL(settings)+'/Backups?pageSize=5&orderBy=__name__%20desc&mask.fieldPaths=kind',{cache:'no-store'}));return JSON.stringify((r.documents||[]).map(d=>[d.name,d.updateTime]));}
+function syncBaseKey(settings){return cloudMetaKey(settings)+':base';}
+function dataEqual(a,b){const clean=x=>Object.fromEntries(Object.entries(x||{}).filter(([k])=>!deviceKeys.includes(k)));return Object.keys(DATA).every(k=>equivalent(k==='settings'?clean(a[k]):a[k]??[],k==='settings'?clean(b[k]):b[k]??[]));}
+function interactionBusy(){return !!(root.document?.querySelector('[data-pos-modal],.style-overlay')||/^(INPUT|TEXTAREA|SELECT)$/.test(root.document?.activeElement?.tagName)||draftRead()?.cart?.length);}
+async function cloudSync(force=false){
+ let settings=read(DATA.settings,{});if(syncBusy||cloudBusy)return;if(settings.autoSync===false&&!force){status('idle','已存本機 · 自動同步已關閉');return;}if(!settings.shopID||!settings.syncToken){status('idle','本機模式 · 請先設定雲端連線');return;}
+ if(root.navigator.onLine===false){status('pending','離線可開單 · 連線後自動同步');return;}
+ if(interactionBusy()){status('pending','本機已保存 · 操作完成後同步');return;}
+ syncBusy=true;const start=revision;status('checking','正在檢查雲端版本');
+ try{
+ const scope=cloudMetaKey(settings),probe=await cloudProbe(settings);if(!force&&scope===lastProbeScope&&probe===lastProbe&&revision===lastSyncRevision&&Date.now()-lastFullCheck<600000){status('saved','已同步 · '+dateTime(new Date()).slice(11));return;}
+ const head=await cloudHead(settings);const local=backupPayload(),baseKey=syncBaseKey(settings);let base=read(baseKey,null),remote=head.document?await unpackCloud(head.document.fields.content.stringValue):null;
+ const meta=read(cloudMetaKey(settings),{});if(!base&&meta.versionId&&head.document){try{base=await cloudDownload(settings,meta.versionId);}catch(e){throw Error('無法讀取上次同步基準，已暫停：'+e.message);}}
+ const tips=versionTips(head.versions);
+ if(tips.length>1){const parents=new Set(tips.map(v=>v.fields?.parentVersion?.stringValue));if(parents.size!==1)throw Error('多台裝置產生不同版本分支，已保留所有資料，請管理者核對後合併');const parent=[...parents][0]?.split(':')[0];if(!parent||parent==='none')throw Error('初次備份有多台裝置同時建立，請先核對版本');const common=await cloudDownload(settings,parent);let aggregate=common;for(const tip of tips){const data=await cloudDownload(settings,tip.versionId);aggregate=mergeData(common,aggregate,data);}remote=aggregate;}
+ let merged;
+ if(!remote)merged=local;
+ else if(!base&&!local.transactions.length&&!local.customers.length&&!local.expenses.length&&!local.inventoryLogs.length&&!local.walletEntries.length)merged={...remote,settings:{...remote.settings,...Object.fromEntries(deviceKeys.filter(k=>settings[k]!==undefined).map(k=>[k,settings[k]]))},draft:local.draft};
+ else merged=mergeData(base,local,remote);
+ merged.settings={...merged.settings,autoSync:settings.autoSync??true,autoCloudBackup:settings.autoCloudBackup??false,autoBackup:settings.autoBackup??false,shopID:settings.shopID,syncToken:settings.syncToken};
+ if(revision!==start||interactionBusy()) {status('pending','操作中 · 下一輪再同步');return;}
+ const needUpload=!remote||!dataEqual(merged,remote)||tips.length>1;
+ // Reserve and commit local changes plus recovery snapshot and receipt together.
+ await transaction(()=>{if(revision!==start||interactionBusy())throw Error('本機正在更新，稍後自動重試');const after={};if(!dataEqual(local,merged)){after[PREFIX+'before-sync']=local;for(const [k,key]of Object.entries(DATA))after[key]=merged[k]??[];}
+ if(remote){after[baseKey]=remote;after[cloudMetaKey(settings)]={confirmed:true,versionId:head.versionId,updateTime:head.document.updateTime};}
+ syncApplying=true;try{atomic(after);}finally{syncApplying=false;}});
+ if(needUpload){await cloudBackup(read(DATA.settings,{}),true,tips.map(v=>v.versionId));const saved=await cloudDownload(read(DATA.settings,{}),read(cloudMetaKey(settings),{}).versionId);syncApplying=true;try{atomic({[baseKey]:saved});}finally{syncApplying=false;}}
+ lastProbe=probe;lastProbeScope=scope;lastFullCheck=Date.now();lastSyncRevision=revision;
+ status('saved','已同步 · '+dateTime(new Date()).slice(11),{at:new Date().toISOString()});
+ }catch(e){status('error',e.message);throw e;}finally{syncBusy=false;}
+}
+function startSync(){let stopped=false,timer;const tick=()=>{if(stopped)return;if(root.document?.visibilityState!=='hidden')cloudSync().catch(()=>{});timer=setTimeout(tick,60000);};timer=setTimeout(tick,1000);const wake=()=>{if(root.document?.visibilityState!=='hidden')cloudSync().catch(()=>{});};root.addEventListener('online',wake);root.document?.addEventListener('visibilitychange',wake);return()=>{stopped=true;clearTimeout(timer);root.removeEventListener?.('online',wake);root.document?.removeEventListener('visibilitychange',wake);};}
+function walletOwnerId(){let key=PREFIX+'wallet-device',v=localStorage.getItem(key);if(!v){v=id();localStorage.setItem(key,v);}return v;}
+function requireWalletOwner(settings){if(!settings.walletDeviceId||settings.walletDeviceId!==walletOwnerId())throw Error('儲值扣款僅限指定收銀裝置，其他裝置可查看；避免兩台離線重複扣款');}
+async function claimWalletDevice(){const settings=read(DATA.settings,{}),owner=walletOwnerId();if(!settings.shopID||!settings.syncToken)throw Error('請先連接雲端，再指定唯一儲值收銀裝置');const url=cloudURL(settings)+'/Backups/wallet-owner-v1';let response=await cloudFetch(url,{cache:'no-store'});if(response.status===404){const create=await cloudFetch(url+'?currentDocument.exists=false',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{kind:{stringValue:'legacy-snapshot'},content:{stringValue:JSON.stringify({format:'salon-wallet-owner-v1',owner})}}})});if(!create.ok&&create.status!==409)await responseJSON(create);response=await cloudFetch(url,{cache:'no-store'});}const doc=await responseJSON(response);if(JSON.parse(doc.fields.content.stringValue).owner!==owner)throw Error('雲端已指定另一台儲值收銀裝置，這台僅能查看餘額');return transaction(d=>atomic({[DATA.settings]:{...d.settings,walletDeviceId:owner}}));}
+function walletBalance(customerId,entries=all().walletEntries){return Math.round(entries.filter(e=>String(e.customerId)===String(customerId)).reduce((n,e)=>n+Number(e.amount||0),0)*100)/100;}
+function walletTopup(input){return transaction(d=>{requireWalletOwner(d.settings);const existing=d.walletEntries.find(e=>e.id===input.id);if(existing)return existing;if(!d.customers.some(c=>!c.archived&&String(c.id)===String(input.customerId)))throw Error('請選擇有效會員');const amount=money(input.amount);if(!amount)throw Error('儲值金額需大於零');const entry={id:input.id||id(),customerId:input.customerId,date:new Date().toISOString(),amount,kind:'topup',paymentMethod:input.paymentMethod||'現金',note:input.note||''};atomic({[DATA.walletEntries]:[...d.walletEntries,entry]});return entry;});}
+function lineFinancials(item,settings={},staff={}){const amount=Number(item.price||0)-Number(item.discount||0),cost=itemCost(item,amount),assistant=Number(item.assistantFee||0),net=amount-cost-(item.isProduct?0:assistant);const rate=Number(item.commissionRate??(staff.useGlobalCommission?settings.commissionRates?.[item.category]:staff.commissionRate)??0);const base=item.commissionModel==='net-v2'?net:amount-((item.deductCost??settings.deductCostBeforeCommission)?cost:0);return {amount,cost,assistant,net,commission:Math.round(Math.max(0,base)*rate/100)};}
+function financials(tx,expenses,staff,settings,monthly){const rows=staff.map(s=>({...s,serviceRevenue:0,productRevenue:0,realRevenue:0,materialCost:0,assistantCost:0,serviceCommission:0,productCommission:0,assistantCommission:0,visits:0})),byId=new Map(rows.map(s=>[String(s.id),s]));let revenue=0,cost=0,serviceRevenue=0,realRevenue=0;
+ for(const t of tx.filter(t=>!t.voided)){revenue+=Number(t.total||0);const seen=new Set();for(const item of t.items||[]){const person=byId.get(String(item.stylistId)),f=lineFinancials(item,settings,person||{});cost+=f.cost;if(!item.isProduct){serviceRevenue+=f.amount;realRevenue+=f.net;}if(person){if(item.isProduct){person.productRevenue+=f.amount;person.productCommission+=f.commission;}else{person.serviceRevenue+=f.amount;person.realRevenue+=f.net;person.materialCost+=f.cost;person.assistantCost+=f.assistant;person.serviceCommission+=f.commission;}seen.add(String(person.id));}const assistant=byId.get(String(item.assistantId));if(assistant)assistant.assistantCommission+=f.assistant;}for(const k of seen)byId.get(k).visits++;}
+ for(const s of rows){s.advanceTotal=expenses.filter(e=>!e.archived&&e.type==='員工借支'&&String(e.staffId||e.relatedStaffId)===String(s.id)).reduce((n,e)=>n+Number(e.amount||0),0);s.totalCommission=s.serviceCommission+s.productCommission+s.assistantCommission;s.fixedPay=monthly?Number(s.baseSalary||0)+Number(s.positionBonus||0)+Number(s.attendanceBonus||0):0;s.totalSalary=s.fixedPay+s.totalCommission-s.advanceTotal;}
+ const cashExpense=expenses.filter(e=>!e.archived).reduce((n,e)=>n+Number(e.amount||0),0),operatingExpense=expenses.filter(e=>!e.archived&&!e.inventoryPurchase&&!['進貨付款','員工借支','薪資發放'].includes(e.type)).reduce((n,e)=>n+Number(e.amount||0),0),salaryCost=rows.reduce((n,s)=>n+s.totalSalary+s.advanceTotal,0);return {rows,revenue,cost,serviceRevenue,realRevenue,cashExpense,operatingExpense,salaryCost,profit:revenue-cost-operatingExpense-salaryCost};}
+
+function scheduleCloud(){clearTimeout(cloudTimer);const settings=read(DATA.settings,{});if(settings.autoSync!==false&&settings.shopID&&settings.syncToken){status('pending','已存本機 · 等待安全同步');cloudTimer=setTimeout(()=>cloudSync().catch(()=>{}),4000);return;}if(!settings.autoCloudBackup){status('pending','已存本機 · 自動同步已關閉');return;}status('pending','資料已存本機，等待背景備份');cloudTimer=setTimeout(()=>cloudBackup(read(DATA.settings,{})).catch(()=>{}),4000);}
 root.addEventListener?.('storage',e=>{if(e.key){cache.delete(e.key);emit(e.key);}else for(const key of listeners.keys()){cache.delete(key);emit(key);}});
 root.addEventListener?.('salon-local-update',e=>{cache.delete(e.key);emit(e.key);});
-root.addEventListener?.('online',()=>{if(read(DATA.settings,{}).autoCloudBackup)scheduleCloud();});
-Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudVersions,cloudSubscribe,cloudSnapshot:()=>cloudState}});
+root.addEventListener?.('online',()=>{scheduleCloud();});
+Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudVersions,cloudSync,startSync,mergeData,versionTips,financials,lineFinancials,walletBalance,walletTopup,walletOwnerId,claimWalletDevice,cloudSubscribe,cloudSnapshot:()=>cloudState}});
 })(window);
