@@ -68,7 +68,7 @@ const SalonContext=React.createContext(null);
         const DEFAULT_EXPENSE_TYPES = ['水費', '電費', '電話費', '網路費', '房租', '自領料(成本)', '雜支', '員工借支'];
         const DEFAULT_COMMISSION = { '剪髮': 50, '洗髮': 30, '染燙': 45, '護理': 45, '造型': 45, '產品': 10 };
         const DEFAULT_GENDER_COLORS = { '男': 'blue', '女': 'rose', '兒童': 'emerald' };
-        
+
         // 定義可選的顏色主題 (theme.fill = 長條圖顏色)
         const COLOR_THEMES = {
             'slate':  { label: '質感灰', bg: 'bg-slate-50', border: 'border-slate-200', hover: 'hover:border-slate-400 hover:bg-slate-100', text: 'text-slate-600', badge: 'bg-slate-100 text-slate-600', accent: 'border-l-slate-400', card_filled: 'bg-slate-50 border-slate-200', fill: '#64748b' },
@@ -150,7 +150,7 @@ function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSu
                         </div>
                         <div className="border p-2 rounded-lg bg-slate-50">
                             <label className="text-xs font-bold text-slate-500 mb-1 block">專屬設計師 (歸戶用)</label>
-                            <select 
+                            <select
                                 className="input-field"
                                 value={form.preferredStylistId}
                                 onChange={e => setForm({...form, preferredStylistId: e.target.value})}
@@ -184,7 +184,7 @@ function CloudStatus(){const state=React.useSyncExternalStore(SalonStore.cloudSu
             </div>
         );
 
-       // --- 6. App ---    
+       // --- 6. App ---
     function HairSalonApp() {
     const access=useAccess();
     const [activeTab, setActiveTab] = useState('pos');
@@ -201,7 +201,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
     const [inventoryLogs, setInventoryLogs] = useStickyState('salon_inventory_logs', []);
     const [expenses, setExpenses] = useStickyState('salon_expenses', []);
     const [pendingOrders, setPendingOrders] = useStickyState('salon_pending_orders', []);
-    
+
     const [settings, setSettings] = useStickyState('salon_settings', {
         categories: DEFAULT_CATEGORIES,
         expenseTypes: DEFAULT_EXPENSE_TYPES,
@@ -271,37 +271,37 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             // --- Views ---
 
             // [查單管理系統] (v18.0)
-            
+
 
             // --- Report View ---
-            
+
 
          // [Inventory View] (v18.7 旗艦版：獨立新增商品 + 進貨廠商 + 領用人員指派)
-            
+
 
 
 
 
         // [POS View] (v19.5 旗艦完美防護版 - 直擊人心會員連動修正版)
-        
+
 
 
             // [StaffView] (v13.0 修正版：防崩潰 + 必填檢查)
-            
 
-            
 
-     
+
+
+
             return (
                 <SalonContext.Provider value={{safeTransactions,showToast,confirmAction,transactions,setTransactions,customers,setCustomers,safeCustomers,safeStylists,safeSettings,getThemeClasses,safeExpenses,setExpenses,safeServices,setServices,setInventoryLogs,safeInventoryLogs,setPendingOrders,safePendingOrders,setStylists,settings,setSettings}}><AccessBoundary settings={settings}><div className="flex h-screen overflow-hidden bg-slate-100">
                     <aside className="salon-sidebar hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
                         <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'}, {id:'ownSalary',icon:User,label:'我的薪資'}, {id:'salary',icon:UserCog,label:'薪資管理'} ].filter(item=>access.allowed(item.id)&&(settings.access?.enabled||!['ownSalary','salary'].includes(item.id))).map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
-                        </nav>                 
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 流暢開單版 1006.0</div>
+                        </nav>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS v18.9 功能整合測試版 1007.0</div>
                     </aside>
-                    
+
                     {/* 手機版全螢幕選單 */}
                     {isMobileMenuOpen && (
                         <div className="mobile-menu lg:hidden fixed inset-0 bg-slate-900/95 z-[100] pt-[env(safe-area-inset-top)] px-6 text-white animate-fade-in flex flex-col">
@@ -310,9 +310,9 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X size={32}/></button>
                             </div>
                             <div className="flex-1 overflow-y-auto pt-4 pb-10">
-                                {[ 
-                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'}, 
-                                    {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'}, {id:'ownSalary',label:'我的薪資'}, {id:'salary',label:'薪資管理'} 
+                                {[
+                                    {id:'pos', label:'開單'}, {id:'orders', label:'查單'}, {id:'report', label:'報表'},
+                                    {id:'customers', label:'客資'}, {id:'staff', label:'人員'}, {id:'inventory', label:'庫存'}, {id:'settings', label:'設定'}, {id:'ownSalary',label:'我的薪資'}, {id:'salary',label:'薪資管理'}
                                 ].filter(item=>access.allowed(item.id)&&(settings.access?.enabled||!['ownSalary','salary'].includes(item.id))).map(item => (
                                     <button key={item.id} onClick={()=>{setActiveTab(item.id); setIsMobileMenuOpen(false);}} className="block text-2xl font-bold w-full text-left py-5 border-b border-white/5 active:bg-white/10">{item.label}</button>
                                 ))}
@@ -333,7 +333,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <div className="workspace-content flex-1 overflow-auto bg-slate-50">{settings.access?.enabled&&<div className="flex justify-end p-2"><button className="btn btn-secondary" onClick={()=>access.lock()}>鎖定工作區 · {access.current()?.name}</button></div>}{activeTab==='ownSalary'&&access.allowed('ownSalary')&&<OwnSalaryView/>}{activeTab==='salary'&&access.allowed('salary')&&<SalaryOnlyView/>}
                             {activeTab === 'pos' && access.allowed('pos') && <POSView />}
                             {activeTab === 'orders' && access.allowed('orders') && <OrderView />}
-                            
+
                             {activeTab === 'report' && access.allowed('report') && <ReportView />}
                             {activeTab === 'customers' && access.allowed('customers') && <CustomerView />}
                             {activeTab === 'staff' && access.allowed('staff') && <StaffView />}
@@ -353,18 +353,18 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
         }
 
 
-    
+
 const EditOrderModal = ({ order, onClose, onSave }) => {
 const {setCustomers,safeCustomers,showToast,safeStylists}=React.useContext(SalonContext);
 
     // 💡 關鍵：我們建立一個與外部完全分離的 Local State
     const [editReason,setEditReason]=useState('');const editAttempt=React.useRef(generateId());const [editBusy,setEditBusy]=useState(false);
-    const [form, setForm] = useState(() => ({...JSON.parse(JSON.stringify(order)),items:(order.items||[]).map((i,n)=>({...i,cartId:i.cartId||order.id+'-line-'+n}))})); 
-    
+    const [form, setForm] = useState(() => ({...JSON.parse(JSON.stringify(order)),items:(order.items||[]).map((i,n)=>({...i,cartId:i.cartId||order.id+'-line-'+n}))}));
+
     // 💡 關鍵：防止輸入框在修改時觸發整個元件的重新對焦與重繪
     const updateItem = useCallback((cartId, field, value) => {
         setForm(prevForm => {
-            const newItems = prevForm.items.map(item => 
+            const newItems = prevForm.items.map(item =>
                 item.cartId === cartId ? { ...item, [field]: value } : item
             );
             const newTotal = newItems.reduce((sum, item) => sum + (Number(item.price) - (Number(item.discount)||0)), 0);
@@ -447,7 +447,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
 
     // --- 核心修正：Firebase 專案 ID 鎖定 ---
     const DEFAULT_PROJECT_ID = "salonpos-system";
-    
+
     // --- 區域狀態防止輸入時介面跳動 ---
     const [localShopID, setLocalShopID] = useState(settings.shopID || '');
     const [localSyncToken, setLocalSyncToken] = useState(settings.syncToken || '');
@@ -477,7 +477,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
     const _addExpenseType = () => { if(expenseTypeInput && !safeSettings.expenseTypes.includes(expenseTypeInput)) { setSettings(prev=>({...prev, expenseTypes: [...safeSettings.expenseTypes, expenseTypeInput]})); setExpenseTypeInput(''); } };
     const _removeCategory = cat => {if(safeServices.some(s=>s.category===cat)||safeTransactions.some(t=>(t.items||[]).some(i=>i.category===cat))){showToast('分類仍有項目或歷史單據，請保留以免漏列統計','error');return;}setSettings(prev=>({...prev, categories:safeSettings.categories.filter(c=>c!==cat)}));};
     const _removeExpenseType = (type) => {if(safeExpenses.some(e=>e.type===type)){showToast('此分類仍有支出紀錄，請保留以免報表漏列','error');return;}setSettings(prev=>({...prev, expenseTypes: safeSettings.expenseTypes.filter(t=>t!==type)}));};
-    
+
     const _exportBackup=()=>{const payload=SalonStore.backupPayload();const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='salon_backup_'+getCurrentDateLocal()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('完整備份下載已啟動（包含掛單）');};
     const _importBackup=async event=>{const file=event.target.files[0];if(!file)return;try{const data=SalonStore.validateBackup(JSON.parse(await file.text()));if(!confirm('備份有 '+data.transactions.length+' 筆訂單、'+data.customers.length+' 位顧客，確定還原？'))return;await SalonStore.restore(data);showToast('資料已還原');}catch(e){showToast(e.message,'error');}finally{event.target.value='';}};
 
@@ -500,7 +500,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
 
     return (
         <div className="p-6 md:p-10 h-full overflow-y-auto max-w-6xl mx-auto space-y-8 pb-32">
-            
+
             {/* 雲端自動連動區塊 */}
             <div className="card p-8 border-l-4 border-amber-500 shadow-md">
                 <h3 className="font-bold text-xl mb-4 text-slate-800 flex items-center gap-2">
@@ -509,10 +509,10 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                         <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第一步：設定客戶店號 (Shop ID)</label>
-                        <input 
-                            className="input-field font-bold text-lg bg-white border-2 border-slate-200" 
-                            placeholder="例如: SpecialSpace_A" 
-                            value={localShopID} 
+                        <input
+                            className="input-field font-bold text-lg bg-white border-2 border-slate-200"
+                            placeholder="例如: SpecialSpace_A"
+                            value={localShopID}
                             onChange={(e) => setLocalShopID(e.target.value)}
                         />
                         <p className="text-[10px] text-slate-400 mt-1">※ 相同店號的資料會存於同一個雲端資料夾</p>
@@ -520,10 +520,10 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                     <div>
                         <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">第二步：手動輸入或生成同步金鑰 (Sync Token)</label>
                         <div className="flex gap-2">
-                            <input 
-                                className="input-field font-mono text-lg text-indigo-600 font-bold bg-white flex-1" 
-                                placeholder="請輸入自訂金鑰密碼" 
-                                value={localSyncToken} 
+                            <input
+                                className="input-field font-mono text-lg text-indigo-600 font-bold bg-white flex-1"
+                                placeholder="請輸入自訂金鑰密碼"
+                                value={localSyncToken}
                                 onChange={(e) => setLocalSyncToken(e.target.value)}
                             />
                             <button onClick={(e) => { e.preventDefault(); const t = Math.random().toString(36).substring(2, 10).toUpperCase(); setLocalSyncToken(t); }} className="btn btn-secondary whitespace-nowrap bg-slate-800 text-white">自動生成</button>
@@ -598,7 +598,7 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
             <div className="card p-8">
                 <h3 className="font-bold text-xl mb-6 text-slate-800">抽成規則</h3>
                 <label className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input type="checkbox" disabled checked={true} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,deductCostBeforeCommission:checked}));}} className="w-5 h-5 accent-indigo-600"/> 
+                    <input type="checkbox" disabled checked={true} onChange={e=>{const checked=e.target.checked;setSettings(prev=>({...prev,deductCostBeforeCommission:checked}));}} className="w-5 h-5 accent-indigo-600"/>
                     <span className="font-bold text-slate-700">計算抽成前，先扣除商品或服務成本 (毛利抽成)</span>
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -657,11 +657,11 @@ const {settings,setSettings,showToast,safeServices,safeStylists,safeCustomers,sa
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">售價</label><input type="number" className="input-field shadow-sm bg-white" value={itemForm.price||0} onChange={e=>setItemForm({...itemForm, price: e.target.value})}/></div>
                             <div>
                                 {itemForm.isProduct?<BusinessProductFields value={itemForm} onChange={setItemForm}/>:<BusinessServiceFields value={itemForm} onChange={setItemForm}/>}<label className="text-xs font-bold text-slate-500 mb-1 block">{itemForm.isProduct?'每件商品成本（元）':'服務材料成本'}</label>{!itemForm.isProduct&&<select className="input-field mb-2" value={itemForm.costMode||(Number(itemForm.cost)>100?'fixed':'percent')} onChange={e=>setItemForm({...itemForm,costMode:e.target.value})}><option value="percent">依服務金額百分比（%）</option><option value="fixed">每次固定金額（元）</option></select>}
-                                <input 
-                                    type="number" 
-                                    className="input-field shadow-sm bg-white" 
-                                    value={itemForm.cost || 0} 
-                                    onChange={e => setItemForm({...itemForm, cost: Number(e.target.value)})} 
+                                <input
+                                    type="number"
+                                    className="input-field shadow-sm bg-white"
+                                    value={itemForm.cost || 0}
+                                    onChange={e => setItemForm({...itemForm, cost: Number(e.target.value)})}
                                     placeholder="例如: 20"
                                 />
                             </div>
@@ -767,7 +767,7 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
                 const [isEditing, setIsEditing] = useState(false);
                 const [editForm, setEditForm] = useState({});
 
-                const handleSave = async () => { 
+                const handleSave = async () => {
                     // 1. 必填檢查
                     if (!editForm.name || editForm.name.trim() === '') {
                         alert('請輸入人員姓名！(Name is required)');
@@ -776,16 +776,16 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
 
                     if(Number(editForm.commissionRate)<0||Number(editForm.commissionRate)>100){showToast('抽成比例需在0至100之間','error');return;}
                     try{if (editForm.id) {
-                        await setStylists(safeStylists.map(s => s.id === editForm.id ? editForm : s)); 
+                        await setStylists(safeStylists.map(s => s.id === editForm.id ? editForm : s));
                     } else {
-                        await setStylists([...safeStylists, { ...editForm, id: generateId() }]); 
+                        await setStylists([...safeStylists, { ...editForm, id: generateId() }]);
                     }
-                    }catch{return;}setIsEditing(false); 
-                    showToast('人員資料已儲存'); 
+                    }catch{return;}setIsEditing(false);
+                    showToast('人員資料已儲存');
                 };
 
                 const deleteStaff=id=>{if(SalonStore.all().transactions.some(t=>(t.items||[]).some(i=>i.stylistId===id))){showToast('此人員有歷史業績，請保留資料以免薪資報表漏列','error');return;}confirmAction('停用人員','停用人員並保留封存資料？',()=>setStylists(safeStylists.filter(s=>s.id!==id)));};
-                
+
                 return (
                     <div className="p-6 md:p-10 h-full overflow-y-auto">
                         <div className="max-w-6xl mx-auto">
@@ -796,13 +796,13 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {safeStylists.map(s => {
                                     const roleKey = s.role || '設計師';
-                                    const theme = (safeSettings.roleColors && safeSettings.roleColors[roleKey]) 
-                                        ? COLOR_THEMES[safeSettings.roleColors[roleKey]] 
+                                    const theme = (safeSettings.roleColors && safeSettings.roleColors[roleKey])
+                                        ? COLOR_THEMES[safeSettings.roleColors[roleKey]]
                                         : COLOR_THEMES['slate'];
-                                    
+
                                     const accentClass = theme ? `${theme.accent} bg-white` : 'border-l-slate-300 bg-white';
                                     const badgeClass = theme ? theme.badge : 'bg-slate-100 text-slate-600';
-                                    
+
                                     const displayName = s.name || '未命名';
                                     const displayInitial = displayName.length > 0 ? displayName.charAt(0) : '?';
 
@@ -844,7 +844,7 @@ const {setStylists,safeStylists,showToast,confirmAction,safeSettings}=React.useC
                                     </div>
                                     <div className="border-t pt-4">
                                         <label className="flex items-center gap-2 mb-3 cursor-pointer">
-                                            <input type="checkbox" checked={editForm.useGlobalCommission} onChange={e=>setEditForm({...editForm, useGlobalCommission: e.target.checked})} className="w-4 h-4 accent-indigo-600"/> 
+                                            <input type="checkbox" checked={editForm.useGlobalCommission} onChange={e=>setEditForm({...editForm, useGlobalCommission: e.target.checked})} className="w-4 h-4 accent-indigo-600"/>
                                             <span className="text-sm font-bold text-slate-700">使用全店統一抽成設定</span>
                                         </label>
                                         {!editForm.useGlobalCommission && (
@@ -881,7 +881,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
             useEffect(()=>{try{SalonStore.draftSave(cart.length||selectedCustomer||adHocCustomerName?currentDraft():null);}catch{showToast('草稿未能儲存，請保留畫面並先下載備份','error');}},[cart,selectedCustomer,adHocCustomerName,adHocGender,selectedStylist,selectedAssistant,checkoutDate,draftId,pendingId]);
             const clearDraft=()=>{setCart([]);setSelectedCustomer(null);setAdHocCustomerName('');setPendingId('');setDraftId(crypto.randomUUID());setCheckoutDate(getCurrentDateTimeLocal());};
             const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-            
+
             const getCategoryColor = (cat) => {
                 const themeKey = safeSettings.categoryColors[cat] || 'slate';
                 return getThemeClasses(themeKey, 'card');
@@ -907,7 +907,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
             // 精準過濾會員：當輸入框有字時才觸過濾
             const filteredCustomers = useMemo(() => {
                 if (!custSearch.trim()) return [];
-                return safeCustomers.filter(c => 
+                return safeCustomers.filter(c =>
                     (c.name || '').includes(custSearch.trim()) || (c.phone || '').includes(custSearch.trim())
                 );
             }, [safeCustomers, custSearch]);
@@ -927,23 +927,23 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                 }
                 const stylistObj = safeStylists.find(s => s.id === selectedStylist);
                 const assistantObj = safeStylists.find(s => s.id === selectedAssistant);
-                
+
                // 這裡一定要用 generateId() 產生唯一的 cartId，React 才知道這是一張永遠的單
-    const newItem = { 
-        cartId: generateId(), 
-        id: service.id, 
-        name: service.name, 
-        price: service.price, 
+    const newItem = {
+        cartId: generateId(),
+        id: service.id,
+        name: service.name,
+        price: service.price,
         cost: service.cost || 0,
-        costMode: service.costMode || (Number(service.cost)>100?'fixed':'percent'), 
-        category: service.category, 
-        stock: service.stock, 
-        isProduct: service.isProduct, 
-        stylistId: selectedStylist, 
-        stylistName: stylistObj?.name || '未指定', 
-        assistantId: selectedAssistant, 
-        assistantName: assistantObj?.name || '', 
-        isDesignated: true, 
+        costMode: service.costMode || (Number(service.cost)>100?'fixed':'percent'),
+        category: service.category,
+        stock: service.stock,
+        isProduct: service.isProduct,
+        stylistId: selectedStylist,
+        stylistName: stylistObj?.name || '未指定',
+        assistantId: selectedAssistant,
+        assistantName: assistantObj?.name || '',
+        isDesignated: true,
         discount: SalonStore.vipDiscount(selectedCustomer,service,safeSettings),commissionOverride:service.commissionOverride,assistantFeeMode:service.assistantFeeMode,assistantFeeValue:service.assistantFeeValue
     };
     setCart([...cart, newItem]);
@@ -968,7 +968,7 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
             return (
                 <div className="pos-layout flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden relative">
                     {isAddingCustomer && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl"><h3 className="font-bold text-lg">快速新增顧客</h3><QuickCustomerForm stylists={safeStylists} onSave={async (data) => { const newCust = { id: generateId(), ...data, visits: 0, totalSpend: 0, tags: [] }; try{await setCustomers([...safeCustomers, newCust]);}catch{return;} setSelectedCustomer(newCust); setIsAddingCustomer(false); }} onCancel={() => setIsAddingCustomer(false)}/></div></div>}
-                    
+
                     {showPending && (
                         <Modal title="暫存單據 (掛單)" onClose={()=>setShowPending(false)} size="max-w-lg">
                             {safePendingOrders.length === 0 ? <p className="text-center text-slate-400 py-4">無暫存單據</p> : safePendingOrders.map(o => (
@@ -996,8 +996,8 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                                     <label className="text-xs font-bold text-slate-400 text-left block">請選擇付款方式</label>
                                    <div className="grid grid-cols-2 gap-2">
     {[...new Set([...(safeSettings.paymentMethods||['現金','信用卡','街口支付','LINE Pay','轉帳']),...(safeSettings.walletDeviceId?['儲值金']:[])])].map(name=>({name,color:paymentChoice===name?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200'})).map((item) => (
-        <button 
-            key={item.name} 
+        <button
+            key={item.name}
             disabled={saving} aria-pressed={paymentChoice===item.name} onClick={() => setPaymentChoice(item.name)}
             className={`py-3 rounded-xl border font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 ${item.color}`}
         >
@@ -1023,15 +1023,15 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
                                 {/* 會員搜尋核心輸入框 */}
                                 <div className="search-field w-full flex-1" id="pos-member-search-box">
                                     <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
-                                    <input 
-                                        type="text" 
-                                        className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all font-medium" 
-                                        placeholder="搜尋會員姓名或電話" aria-label="搜尋會員姓名或電話" 
-                                        value={custSearch} 
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm focus:ring-2 ring-indigo-100 outline-none transition-all font-medium"
+                                        placeholder="搜尋會員姓名或電話" aria-label="搜尋會員姓名或電話"
+                                        value={custSearch}
                                         onChange={e => setCustSearch(e.target.value)}
                                     />
                                     {custSearch && (
-                                        <button 
+                                        <button
                                             type="button"
                                             onClick={() => setCustSearch('')}
                                             className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200 transition-colors"
@@ -1042,27 +1042,27 @@ const {safeStylists,safeSettings,getThemeClasses,showToast,safeCustomers,safeSer
 
                                     {/* 下拉選單區塊 */}
                                     {custSearch && filteredCustomers.length > 0 && (
-                                        <div 
+                                        <div
                                             id="pos-member-dropdown"
                                             tabIndex={-1}
                                             className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto divide-y divide-slate-100 outline-none"
                                         >
                                             {filteredCustomers.map(c => (
-<div 
+<div
     key={c.id}
     onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
       // ⚡ 直接戳當前 POSView 的大腦，精緻塞入客資！
 setSelectedCustomer(c); // 🚀 直接把帶有大寫 Name 和 Phone 的原始會員物件塞進去！
 setAdHocCustomerName('');
 setAdHocGender(c.Gender || c.gender || '女');
-        
+
 if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferredStylistId)) && (!cart.length||confirm('是否將目前項目改由這位顧客的專屬設計師服務？'))) {
-            setSelectedStylist(c.preferredStylistId);setCart(prev=>prev.map(i=>({...i,stylistId:c.preferredStylistId,stylistName:safeStylists.find(s=>s.id===c.preferredStylistId)?.name||''}))); 
+            setSelectedStylist(c.preferredStylistId);setCart(prev=>prev.map(i=>({...i,stylistId:c.preferredStylistId,stylistName:safeStylists.find(s=>s.id===c.preferredStylistId)?.name||''})));
         }
-        
+
         setCustSearch(''); // 點完後立刻清空搜尋，讓下拉清單完美收合
         showToast(`已成功連動正式會員：${c.name}`);
     }}
@@ -1100,20 +1100,20 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                         </div>
                                     ) : (
                                         <div className="relative flex items-center">
-                                            <input 
-                                                type="text" 
-                                                className="w-36 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all placeholder-slate-400" 
-                                                placeholder="散客姓名（選填）" 
-                                                value={adHocCustomerName} 
+                                            <input
+                                                type="text"
+                                                className="w-36 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all placeholder-slate-400"
+                                                placeholder="散客姓名（選填）"
+                                                value={adHocCustomerName}
                                                 onChange={e => setAdHocCustomerName(e.target.value)}
                                             />
                                             <User className="absolute left-2.5 text-slate-400" size={16}/>
                                         </div>
                                     )}
 
-                                    <select 
+                                    <select
                                         className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
-                                        disabled={!!selectedCustomer} value={selectedCustomer ? (selectedCustomer.gender || '女') : adHocGender} 
+                                        disabled={!!selectedCustomer} value={selectedCustomer ? (selectedCustomer.gender || '女') : adHocGender}
                                         onChange={e => {
                                             if (selectedCustomer) {
                                                 setSelectedCustomer(null);
@@ -1132,12 +1132,12 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
                             <div className="service-grid grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                                {filteredServices.map(s => { 
-                                    const inCartCount = cart.filter(i => i.id === s.id).length; 
-                                    const remaining = s.stock !== null ? s.stock - inCartCount : null; 
-                                    const noStock = remaining !== null && remaining <= 0; 
+                                {filteredServices.map(s => {
+                                    const inCartCount = cart.filter(i => i.id === s.id).length;
+                                    const remaining = s.stock !== null ? s.stock - inCartCount : null;
+                                    const noStock = remaining !== null && remaining <= 0;
                                     const colorClass = getCategoryColor(s.category);
-                                    
+
                                     return (
                                         <button key={s.id} style={serviceTint(s,safeSettings)} onClick={() => addToCart(s)} disabled={noStock} className={`text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${colorClass} ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'active:scale-95 shadow-sm hover:shadow-md'}`}>
                                             <div className="flex justify-between mb-2">
@@ -1162,30 +1162,30 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                 <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-bold">{cart.length} 項目</span>
                             </div>
                         </div>
-                        
+
                        {/* 🚀 開單顧客顯示卡片 (含轉為會員快捷按鈕) */}
 <div className="px-4 pt-3 space-y-2">
     <div className="flex justify-between items-center">
         <label className="text-xs font-bold text-slate-400">當前開單顧客</label>
         {/* 只有在散客狀態下，才顯示轉為會員按鈕 */}
         {!selectedCustomer && (
-            <button 
+            <button
                 type="button"
                 onClick={async () => {
                     const name = prompt('請輸入新會員姓名：', adHocCustomerName);
                     if (!name) return;
                     const phone = prompt('請輸入電話號碼：');
                     if (!phone) return;
-                    
-                    const newCust = { 
-                        id: generateId(), 
-                        name, 
-                        phone, 
-                        gender: adHocGender, 
-                        notes: '快速轉會員', 
-                        visits: 0, 
-                        totalSpend: 0, 
-                        tags: [] 
+
+                    const newCust = {
+                        id: generateId(),
+                        name,
+                        phone,
+                        gender: adHocGender,
+                        notes: '快速轉會員',
+                        visits: 0,
+                        totalSpend: 0,
+                        tags: []
                     };
                     if(safeCustomers.some(c=>(c.phone||'').replace(/\D/g,'')===phone.replace(/\D/g,''))){showToast('已有相同電話會員，請用搜尋選取','error');return;}
                     try{await setCustomers([...safeCustomers, newCust]);}catch{return;}
@@ -1199,9 +1199,9 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
             </button>
         )}
     </div>
-    
+
     {selectedCustomer && (selectedCustomer.name || selectedCustomer.Name) ? (
-    
+
                             /* 💎 正式會員高質感藍紫色卡片 */
     <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 border border-indigo-400 p-4 rounded-xl flex justify-between items-center shadow-md text-white animate-fade-in w-full">
         <div className="flex-1 min-w-0">
@@ -1218,14 +1218,14 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
 </div>
         </div>
         ...
-                                    <button 
+                                    <button
                                         type="button"
-                                        onClick={(e) => { 
+                                        onClick={(e) => {
                                             e.preventDefault();
-                                            setSelectedCustomer(null); 
+                                            setSelectedCustomer(null);
                                             setAdHocCustomerName('');
-                                            showToast('已解除會員連動，恢復散客單'); 
-                                        }} 
+                                            showToast('已解除會員連動，恢復散客單');
+                                        }}
                                         className="w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center font-bold shadow-sm transition-all active:scale-90 text-sm ml-2 flex-shrink-0"
                                         title="解除連動"
                                     >
@@ -1243,13 +1243,13 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                                         </div>
                                     </div>
                                     {adHocCustomerName && adHocCustomerName.trim() && (
-                                        <button 
+                                        <button
                                             type="button"
-                                            onClick={(e) => { 
+                                            onClick={(e) => {
                                                 e.preventDefault();
-                                                setAdHocCustomerName(''); 
-                                                showToast('已清空散客姓名'); 
-                                            }} 
+                                                setAdHocCustomerName('');
+                                                showToast('已清空散客姓名');
+                                            }}
                                             className="font-bold text-slate-300 hover:text-red-500 px-2 transition-colors text-base"
                                         >
                                             ✕
@@ -1259,9 +1259,9 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                             )}
                         </div>
                         <div className="px-4 pt-3"><label className="text-xs font-bold text-slate-400 mb-1 block">訂單日期</label><input type="datetime-local" className="input-field" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} /></div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                           
+
                       {/* 這裡把外層 button 改成 div，防止點擊「修改」或「刪除」時觸發整張卡片的點擊事件 */}
  {cart.map((item, idx) => {
     const catColorKey = safeSettings.categoryColors[item.category] || 'slate';
@@ -1273,10 +1273,10 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                 <span className="text-slate-800">{item.name}</span>
                 <span className="text-slate-700 font-black font-mono">{formatCurrency(item.price)}</span>
             </div>
-            
+
             <div className="flex gap-2 mt-2"><select aria-label={item.name+'服務人員'} className="input-field text-sm" value={item.stylistId} onChange={e=>{const person=safeStylists.find(s=>String(s.id)===e.target.value);setCart(prev=>prev.map(c=>c.cartId===item.cartId?{...c,stylistId:person.id,stylistName:person.name}:c));}}>{safeStylists.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select><button className="btn btn-secondary text-xs" onClick={()=>{const n=prompt('折扣金額（不是折數）',item.discount||0);if(n!==null&&n.trim()!==''&&Number.isFinite(Number(n))&&Number(n)>=0&&Number(n)<=item.price)setCart(prev=>prev.map(c=>c.cartId===item.cartId?{...c,discount:Number(n)}:c));}}>折扣 {item.discount||0}</button></div><div className="flex justify-end gap-2 mt-2">
                 {/* 絕對不會閃跳的修改金額按鈕 */}
-                <button 
+                <button
                     type="button"
                     className="p-1.5 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"
                     onClick={(e) => {
@@ -1293,9 +1293,9 @@ if (c.preferredStylistId && safeStylists.some(s=>String(s.id)===String(c.preferr
                 >
                     <Edit size={16}/><span>改價</span>
                 </button>
-                
+
                 {/* 絕對不會閃跳的刪除按鈕 */}
-                <button 
+                <button
                     type="button"
                     className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
                     onClick={(e) => {
@@ -1349,12 +1349,12 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                 const [internalUseType, setInternalUseType] = useState('shop'); // 新增：店用(shop) 或 設計師(designer)
                 const [selectedStaffId, setSelectedStaffId] = useState(''); // 新增：領用設計師 ID
                 const [adjustType, setAdjustType] = useState('inc');
-                const [searchTerm, setSearchTerm] = useState(''); 
+                const [searchTerm, setSearchTerm] = useState('');
                 const [isAddingNewProduct, setIsAddingNewProduct] = useState(false); // 新增：在此頁直接建品項的開關
                 const [newProductForm, setNewProductForm] = useState({ name: '', price: '', cost: '', category: '產品' });
 
                 // 過濾商品 (只顯示產品類，並支援搜尋)
-                const products = safeServices.filter(s => 
+                const products = safeServices.filter(s =>
                     s.isProduct && [s.name,s.category,s.supplier,s.brand,s.productKind,s.sku].filter(Boolean).join(' ').toLowerCase().includes(searchTerm.toLowerCase())
                 );
 
@@ -1378,7 +1378,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                     setNewProductForm({ name: '', price: '', cost: '', category: '產品' });
                     showToast(`商品 [${newProd.name}] 建立成功！`);
                 };
-                
+
                 const [inventorySaving,setInventorySaving]=useState(false);const inventoryLock=React.useRef(false);
                 const handleInventoryAction=async actionType=>{if(!targetItem||inventoryLock.current)return;inventoryLock.current=true;setInventorySaving(true);try{await SalonStore.inventory({id:targetItem.id,action:actionType,qty,cost,note,supplier,recordPayment,internalUseType,staffId:selectedStaffId,adjustType});setTargetItem(null);setQty(1);setCost(0);setNote('');setSupplier('');setSelectedStaffId('');setRecordPayment(false);setInternalUseType('shop');setMode('list');showToast('庫存與異動紀錄已儲存');}catch(e){showToast(e.message,'error');}finally{inventoryLock.current=false;setInventorySaving(false);}};
 
@@ -1389,12 +1389,12 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                                 <button onClick={()=>setMode('list')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${mode==='list'?'bg-slate-800 text-white shadow-lg':'bg-white text-slate-600'}`}><Box size={18}/> 庫存總覽</button>
                                 <button onClick={()=>setMode('logs')} className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all ${mode==='logs'?'bg-slate-800 text-white shadow-lg':'bg-white text-slate-600'}`}><Table size={18}/> 異動紀錄</button>
                             </div>
-                            
+
                             {mode === 'list' && (
                                 <div className="flex gap-2 w-full md:w-auto justify-end">
                                     <div className="search-field w-full md:w-64">
                                         <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-                                        <input type="text" className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/> 
+                                        <input type="text" className="input-field pl-10 py-2" placeholder="搜尋商品..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
                                     </div>
                                     <button onClick={() => setIsAddingNewProduct(true)} className="btn btn-primary text-sm whitespace-nowrap"><Plus size={16}/> 新增商品</button>
                                 </div>
@@ -1405,7 +1405,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                         {mode === 'list' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                                 {products.map(p => {
-                                    const isLowStock = p.stock <= (p.lowStock??5); 
+                                    const isLowStock = p.stock <= (p.lowStock??5);
                                     const themeKey = safeSettings.categoryColors[p.category] || 'slate';
                                     const badgeClass = getThemeClasses(themeKey, 'badge');
 
@@ -1421,7 +1421,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                                                     <div className="text-[10px] text-slate-400">庫存數量</div>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex justify-between items-center text-sm text-slate-500 mb-4 bg-white/50 p-2 rounded-lg">
                                                 <span>成本單價:</span>
                                                 <span className="font-mono font-bold">${p.cost}</span>
@@ -1471,7 +1471,7 @@ const {safeServices,setServices,showToast,safeStylists,setExpenses,safeExpenses,
                                             <tr key={l.id} className="hover:bg-slate-50">
                                                 <td className="p-4 text-slate-500">{new Date(l.date).toLocaleString()}</td>
                                                 <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-bold 
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold
                                                         ${l.type==='進貨'?'bg-emerald-100 text-emerald-700':
                                                           l.type==='銷售'?'bg-blue-100 text-blue-700':
                                                           l.type==='領用'?'bg-orange-100 text-orange-700':
@@ -1580,7 +1580,7 @@ const {safeTransactions,safeExpenses,safeStylists,safeSettings,showToast,setExpe
 
                 const [rangeEnd,setRangeEnd]=useState(getCurrentDateLocal());
                 const [view, setView] = useState('dashboard');
-                const [reportMode, setReportMode] = useState('month'); 
+                const [reportMode, setReportMode] = useState('month');
                 const [queryDate, setQueryDate] = useState(getCurrentDateLocal().slice(0, 7)); // Default YYYY-MM
                 const [newExpense, setNewExpense] = useState({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
                 const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -1676,18 +1676,18 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
     }
 
     // 3. 準備寫入資料 (增加對 staffId 的處理)
-    const expenseData = { 
-        ...newExpense, 
-        id: generateId(), 
+    const expenseData = {
+        ...newExpense,
+        id: generateId(),
         amount: expenseAmount,
         // 如果不是借支，強制把 staffId 設為空，避免殘留 ID 影響薪資計算
         staffId: newExpense.type === '員工借支' ? newExpense.staffId : ''
     };
 
     try{await setExpenses(prev=>[...prev,expenseData]);}catch{return;}
-    
+
     // 4. 重置與收尾
-    setShowExpenseModal(false); 
+    setShowExpenseModal(false);
     setNewExpense({ date: getCurrentDateLocal(), type: '雜支', amount: '', note: '', staffId: '' });
     showToast('支出已記錄');
 };
@@ -1730,7 +1730,7 @@ const exportReport=()=>{const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
                                                 const catTotal = reportTx.reduce((sum, t) => sum + (t.items||[]).filter(i=>i.category===cat).reduce((s,i)=>s+(i.price-(i.discount||0)),0), 0);
                                                 const percent = totalRevenue > 0 ? (catTotal / totalRevenue) * 100 : 0;
                                                 if (percent === 0) return null;
-                                                
+
                                                 // 使用自訂顏色
                                                 const themeKey = safeSettings.categoryColors[cat] || 'slate';
                                                 const fillColor = getThemeClasses(themeKey, 'fill') || '#6366f1';
@@ -1849,12 +1849,12 @@ useEffect(()=>setVisibleCount(60),[queryDate,searchTerm,dateMode,filterStylist,r
 const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrder(updatedOrder);setEditingOrder(null);showToast('訂單與庫存、會員累計已更新');}catch(e){showToast(e.message,'error');}};
 
 // 替換你原本的 EditOrderModal
-                
+
                 return (
                     <div className="p-6 h-full overflow-y-auto">
                         <div className="page-heading mb-6">
                             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ClipboardList className="text-indigo-500"/> 查單管理系統</h2>
-                            
+
                             <div className="order-toolbar">
                                 <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-300">
                                     <button onClick={() => handleModeChange('month')} className={`px-3 py-1 text-sm rounded-md transition-colors ${dateMode==='month' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>月</button>
@@ -1874,9 +1874,9 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
 
                         const customer = safeCustomers.find(c => c.id === t.customerId);
                         // 優先讀取訂單上記錄的散客性別(customerGender)，如果找不到(代表舊會員訂單)，再去找會員資料夾裡的性別(gender)
-                        const gender = t.customerGender || customer?.gender || '女'; 
+                        const gender = t.customerGender || customer?.gender || '女';
                         const isVip = (customer?.totalSpend || 0) > 10000;
-                                
+
                                  // 讀取自訂顏色
                                 const themeKey = safeSettings.genderColors[gender] || 'slate';
                                 const cardClass = getThemeClasses(themeKey, 'card_filled');
@@ -1934,7 +1934,7 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                                 );
                             })}
                         </div>
-                        
+
                         {filteredOrders.length === 0 && (
                             <div className="text-center py-20 bg-white rounded-xl border border-dashed text-slate-400 flex flex-col items-center gap-2">
                                 <ClipboardList size={40} className="opacity-20"/>
@@ -1988,7 +1988,7 @@ function BusinessProductFields({value,onChange}){return <details className="bord
 function BusinessVipSettings(){const {settings,setSettings,showToast}=React.useContext(SalonContext);const [tiers,setTiers]=useState(settings.vipTiers||[]),[include,setInclude]=useState(!!settings.vipIncludeProducts),[busy,setBusy]=useState(false);return <details className="card p-5"><summary>會員等級與優惠</summary><div className="space-y-4 mt-4"><p className="text-sm">依會員累積消費選擇符合門檻最高的等級。先選會員再加入項目，優惠只影響新加入的項目，既有草稿與歷史單據不重算。</p>{tiers.map((t,n)=><div className="business-grid border-b pb-4" key={t.id}><BField label="等級名稱" value={t.name} onChange={v=>setTiers(tiers.map((x,i)=>i===n?{...x,name:v}:x))}/><BField label="累積消費門檻" type="number" value={t.threshold} onChange={v=>setTiers(tiers.map((x,i)=>i===n?{...x,threshold:v}:x))}/><BField label="優惠百分比（10＝減10%）" type="number" value={t.discountPercent} onChange={v=>setTiers(tiers.map((x,i)=>i===n?{...x,discountPercent:v}:x))}/><label><input type="checkbox" checked={!t.disabled} onChange={e=>setTiers(tiers.map((x,i)=>i===n?{...x,disabled:!e.target.checked}:x))}/>啟用</label></div>)}<button className="btn btn-secondary" onClick={()=>setTiers([...tiers,{id:generateId(),name:'VIP',threshold:10000,discountPercent:10}])}>新增會員等級</button><label className="flex gap-2"><input type="checkbox" checked={include} onChange={e=>setInclude(e.target.checked)}/>商品也適用優惠</label><button className="btn btn-primary" disabled={busy} onClick={async()=>{if(busy)return;setBusy(true);try{const rows=tiers.map(t=>{if(!t.name.trim())throw Error('請填等級名稱');const threshold=SalonStore.money(t.threshold),discountPercent=SalonStore.money(t.discountPercent);if(discountPercent>100)throw Error('優惠百分比不可超過100');return {...t,threshold,discountPercent};});await setSettings(p=>({...p,vipTiers:rows,vipIncludeProducts:include}));showToast('會員優惠已儲存');}catch(e){showToast(e.message,'error');}finally{setBusy(false);}}}>儲存會員優惠</button></div></details>;}
 function BusinessServiceFields({value,onChange}){const set=(k,v)=>onChange({...value,[k]:v});return <details className="border rounded-xl p-3 mt-3"><summary>單項抽成與協助費</summary><div className="business-grid mt-3"><BField label="單項抽成 %（空白沿用人員設定）" type="number" value={value.commissionOverride??''} onChange={v=>set('commissionOverride',v)}/><BField label="協助費方式"><select className="input-field" value={value.assistantFeeMode||'global'} onChange={e=>onChange({...value,assistantFeeMode:e.target.value,assistantFeeValue:e.target.value==='global'?undefined:(value.assistantFeeValue??0)})}><option value="global">沿用店家</option><option value="fixed">固定金額</option><option value="percent">折扣後金額百分比</option></select></BField>{value.assistantFeeMode&&value.assistantFeeMode!=='global'&&<BField label="單項協助費數值" type="number" value={value.assistantFeeValue??0} onChange={v=>set('assistantFeeValue',v)}/>}</div></details>;}
 
-        
+
 function WalletBonusPolicy(){const {settings,setSettings,showToast}=React.useContext(SalonContext);return <details className="card p-5"><summary>儲值扣款順序</summary><label><input type="checkbox" checked={!!settings.walletBonusFirst} onChange={async e=>{try{await setSettings(p=>({...p,walletBonusFirst:e.target.checked}));}catch(err){showToast(err.message,'error');}}}/> 優先使用贈送金（未勾選為本金優先）</label><p>只影響之後的新消費，既有扣款紀錄維持原樣。</p></details>;}
 function WalletAdjustPanel({customer}){const {showToast}=React.useContext(SalonContext),[kind,setKind]=useState('withdraw'),[amount,setAmount]=useState(''),[reason,setReason]=useState(''),[method,setMethod]=useState('現金'),[date,setDate]=useState(SalonStore.day(new Date())),[busy,setBusy]=useState(false),attempt=React.useRef(generateId());return <details className="mt-4"><summary>本金退款／另外加贈</summary><div className="space-y-3 mt-3"><BField label="儲值異動"><select className="input-field" value={kind} onChange={e=>setKind(e.target.value)}><option value="withdraw">本金退款</option><option value="bonus">另外加贈</option></select></BField><BField label="異動金額" type="number" value={amount} onChange={setAmount}/><BField label="異動日期" type="date" value={date} onChange={setDate}/><BField label="儲值異動原因" value={reason} onChange={setReason}/>{kind==='withdraw'&&<BField label="本金退款方式" value={method} onChange={setMethod}/>}<p>贈送金不可兌換現金。本金退款請在實際退回後登記。</p><button className="btn btn-primary" disabled={busy} onClick={async()=>{setBusy(true);try{await SalonStore.walletAdjust({id:attempt.current,customerId:customer.id,kind,amount,reason,method,date});attempt.current=generateId();setAmount('');setReason('');showToast('儲值異動已保存');}catch(e){showToast(e.message,'error');}finally{setBusy(false);}}}>確認儲值異動</button></div></details>;}
 

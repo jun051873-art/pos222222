@@ -19,15 +19,15 @@
 開啟 `business-preview.html`，全部資料為虛構示範；這是本機隔離測試頁，不是正式自用網址。資料僅放在記憶體，重新整理即重置；原有瀏覽器儲存區不讀不寫。CSP 和程式雙重禁止網路請求。不適合正式營業或保存資料。
 
 重建：`npm ci --ignore-scripts && npm run build && node scripts/build-business-preview.cjs`
-驗證：`npm test && node tests/business-preview.cjs`; 規則測試命令見 `tests/firestore-business-rules.cjs`（需要 Firebase Emulator 及 rules-unit-testing）
+驗證：`npm test && node tests/business-preview.cjs`。Firestore 規則測試（需要 Java 與 Emulator 套件）：`POS_RULE_TEST_ROOT=/tmp/pos-rule-tests firebase emulators:exec --only firestore --project demo-pos-integration --config migration/firebase.test.json 'node tests/firestore-business-rules.cjs'`。
 
 ## 更新正式網址前的必要事項
 
 1. **正式雲端尚未切換**：新增 `migration/firestore-business-v3.rules` 是候選規則，尚未在 Firestore Emulator、正式後台測試或部署，也沒有建立 `business-protocol-v3` 管理標記。此版本遇到新帳本會停止上傳；勿把正式資料接上測試預覽。先在隔離 Firebase 專案驗證規則與標記，再安排逐台升級和恢復舊版流程；完成前不把測試分支發佈到正式網址。
 2. **薪資結帳週期**：已支援未付款薪資撤回及舊鎖定薪資借支核對。仍須以真實複製資料逐月對帳；付款後更正只記錄補發／收回，不會改寫原薪資條。
 3. **權限邊界**：PIN與角色只在共用裝置的UI/寫入路徑生效，金鑰雜湊為PBKDF2；不是伺服器身分驗證或加密。任何有權讀取Firestore Token的裝置仍可能取得全部資料；不能用來保護雲端財務機密。
-4. **規則與實機驗收**：規則模擬器目前未通過驗證，真實雲端完全未連線或改動。需恢復 Emulator 套件後驗證舊端／新端規則，並用複製資料測試全新裝置、離線交叉改單、同時付款、還原後再同步。
-5. **UI 與硬體**：目前有 DOM 操作測試；尚未在店內平板與手機逐步實測開單、退貨、薪資、離線再連線與列印，也未確認 iOS 10.3 相容性。隔離預覽伺服器目前未能從雲端瀏覽器連線。
+4. **規則與實機驗收**：Firestore Emulator 的隔離規則測試已通過；正式雲端仍未連線或改動。正式切換前須由管理者部署規則並在對應店號建立一次新版標記，再用複製資料測試全新裝置、離線交叉改單、同時付款、還原後再同步。
+5. **UI 與硬體**：目前有 DOM 操作測試；尚未在店內平板與手機逐步實測開單、退貨、薪資、離線再連線與列印，也未確認 iOS 10.3 相容性。隔離預覽尚未完成真實手機／平板視覺驗收。
 6. **功能差異**：網址版尚未承接單機版完整進銷存盤點、薪資歷史更正／多角色雲端身分授權。此專案定位為自用網址版，不包含 Android 打包或 Play 商店上架工作。
 
 ## 計算限制
