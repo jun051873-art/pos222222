@@ -1,0 +1,31 @@
+// Candidate only. Review against deployed rules and test in emulator before deployment.
+// This preserves the existing token-link access model; it is NOT user authentication.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /SalonPOS/{shop} {
+      allow read: if true;
+      match /Tokens/{token} {
+        allow get: if true;
+        allow list, create, update, delete: if false;
+        match /Backups/{version} {
+          function migrated() {
+            return exists(/databases/$(database)/documents/SalonPOS/$(shop)/Tokens/$(token)/Backups/business-protocol-v3);
+          }
+          allow read: if true;
+          // The marker is provisioned by an administrator, never by a browser.
+          allow create: if version != 'business-protocol-v3'
+            && request.resource.data.content is string
+            && request.resource.data.content.size() <= 1000000
+            && (!migrated() || (version == 'wallet-owner-v1')
+                || (request.resource.data.businessSchema == 3
+                    && request.resource.data.parentVersion is string));
+          allow update, delete: if false;
+        }
+      }
+      match /{collection}/{document=**} {
+        allow read, write: if collection != 'Tokens';
+      }
+    }
+  }
+}
