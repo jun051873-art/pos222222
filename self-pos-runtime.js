@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 const PREFIX='pos222222:', B=root.AetherPosBridge,codec=root.SalonStorageCodec||JSON;
-const DATA={services:'salon_services',stylists:'salon_stylists',customers:'salon_customers',transactions:'salon_transactions',inventoryLogs:'salon_inventory_logs',expenses:'salon_expenses',settings:'salon_settings',pendingOrders:'salon_pending_orders',walletEntries:'salon_wallet_entries'};
+const DATA={services:'salon_services',stylists:'salon_stylists',customers:'salon_customers',transactions:'salon_transactions',inventoryLogs:'salon_inventory_logs',expenses:'salon_expenses',settings:'salon_settings',pendingOrders:'salon_pending_orders',walletEntries:'salon_wallet_entries',businessEvents:'salon_business_events'};
 const DRAFT=PREFIX+'draft', cache=new Map(), listeners=new Map(),downloadVersions=new WeakMap();
 let sequence=Promise.resolve(), revision=0, cloudBusy=false, syncBusy=false, syncApplying=false, cloudTimer, cloudState={state:'idle',message:'本機資料保存；雲端尚未檢查'};
 const emit=key=>{for(const f of listeners.get(key)||[])f();};
@@ -12,7 +12,7 @@ function subscribe(key,fn){if(!listeners.has(key))listeners.set(key,new Set());l
 function customerRecord(c){return {...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:Number(c.visits??c.Visits??0),totalSpend:Number(c.totalSpend??c.TotalSpend??0)};}
 function all(){return Object.fromEntries(Object.entries(DATA).map(([name,key])=>[name,read(key,name==='settings'?{}:[])]));}
 function atomic(after){
- B.recover();const encoded=Object.entries(after).filter(([k,v])=>{const entry=cache.get(k);return !entry||entry.value!==v||entry.raw!==localStorage.getItem(k);}).map(([k,v])=>[k,codec.stringify(v)]).filter(([k,v])=>localStorage.getItem(k)!==v);if(!encoded.length)return;
+ B.recover();if(after[DATA.businessEvents])validateBusiness({...all(),...Object.fromEntries(Object.entries(DATA).filter(([,k])=>k in after).map(([n,k])=>[n,after[k]]))});const encoded=Object.entries(after).filter(([k,v])=>{const entry=cache.get(k);return !entry||entry.value!==v||entry.raw!==localStorage.getItem(k);}).map(([k,v])=>[k,codec.stringify(v)]).filter(([k,v])=>localStorage.getItem(k)!==v);if(!encoded.length)return;
  const changed=encoded.map(([k])=>[k,after[k]]),journalKey=B.PREFIX+'journal',journal=codec.stringify({after:Object.fromEntries(changed)});
  // Reserve enough space for both the journal and every growing value before
  // changing authoritative data. Other apps sharing this origin are untouched.
@@ -39,14 +39,15 @@ async function checkout(input){return transaction(d=>{
  const existing=d.transactions.find(t=>t.id===input.id);if(existing){const lines=items=>JSON.stringify(items.map(i=>[String(i.id),Number(i.price),Number(i.discount||0),String(i.stylistId)]));if(lines(existing.items)!==lines(input.items)||String(existing.customerId||'')!==String(input.customerId||'')||existing.paymentMethod!==input.paymentMethod||dateTime(existing.date)!==dateTime(input.date.length===16?input.date+':00+08:00':input.date))throw Error('此草稿已在另一個分頁完成，內容與目前畫面不同；請先查單，未重複入帳');return existing;}
  if(!input.items.length)throw Error('請先加入服務或商品');if(!input.stylistId)throw Error('請選擇設計師');
  d.customers=d.customers.map(customerRecord);const st=d.stylists.find(s=>!s.archived&&String(s.id)===String(input.stylistId));if(!st)throw Error('設計師資料已變更，請重新選擇');
- const settings=d.settings;const items=input.items.map(i=>{const price=money(i.price),discount=money(i.discount||0);money(i.cost||0);if(discount>price)throw Error('折扣不能大於售價');const person=d.stylists.find(s=>!s.archived&&String(s.id)===String(i.stylistId));if(!person)throw Error('項目設計師已停用或刪除，請重新選擇');const rate=person.useGlobalCommission?Number(settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0);if(!Number.isFinite(rate)||rate<0||rate>100)throw Error('抽成比例需在0至100之間，請先核對人員或分類設定');return {...i,price,discount,stylistId:person.id,stylistName:person.name,commissionRate:rate,commissionModel:'net-v2',assistantFee:i.assistantId&&!i.isProduct&&String(i.assistantId)!==String(i.stylistId)?money(settings.assistantFee||0):0,deductCost:!!settings.deductCostBeforeCommission};});
+ const settings=d.settings;const items=input.items.map(i=>{const price=money(i.price),discount=money(i.discount||0);money(i.cost||0);if(discount>price)throw Error('折扣不能大於售價');const person=d.stylists.find(s=>!s.archived&&String(s.id)===String(i.stylistId));if(!person)throw Error('項目設計師已停用或刪除，請重新選擇');const rate=i.commissionOverride!==undefined&&i.commissionOverride!==''?Number(i.commissionOverride):i.isProduct&&person.productCommissionRate!==undefined?Number(person.productCommissionRate):person.useGlobalCommission?Number(settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0);if(!Number.isFinite(rate)||rate<0||rate>100)throw Error('抽成比例需在0至100之間，請先核對人員或分類設定');return {...i,price,discount,stylistId:person.id,stylistName:person.name,commissionRate:rate,commissionModel:'net-v2',assistantFee:i.assistantId&&!i.isProduct&&String(i.assistantId)!==String(i.stylistId)?(i.assistantFeeMode==='percent'?money(round((price-discount)*money(i.assistantFeeValue||0)/100)):money(i.assistantFeeValue??settings.assistantFee??0)):0,deductCost:!!settings.deductCostBeforeCommission};});
  const needed={};for(const i of items)if(i.isProduct)needed[i.id]=(needed[i.id]||0)+1;
  const services=d.services.map(s=>{if(!needed[s.id])return s;if(s.archived)throw Error('商品已停用，請移除後重新選擇');const stock=Number(s.stock);if(!Number.isInteger(stock)||stock<needed[s.id])throw Error(s.name+'庫存不足，請重新核對');delete needed[s.id];return {...s,stock:stock-items.filter(i=>i.isProduct&&String(i.id)===String(s.id)).length};});
  if(Object.keys(needed).length)throw Error('有商品已刪除，請重新核對');
  const customer=input.customerId?d.customers.find(c=>!c.archived&&String(c.id)===String(input.customerId)):null;if(input.customerId&&!customer)throw Error('顧客資料已變更，請重新選擇');
  if(!dateTime(input.date))throw Error('請填寫正確日期');
  const order={id:input.id,date:input.date.length===16?input.date+':00+08:00':input.date,createdAt:new Date().toISOString(),items,total:Math.round(items.reduce((n,i)=>n+itemAmount(i),0)*100)/100,paymentMethod:input.paymentMethod,mainStylistId:st.id,customerId:customer?.id||null,customerName:customer?.name||input.customerName||'散客',customerGender:customer?.gender||input.gender||'未填寫'};
- let walletEntries=d.walletEntries;if(input.paymentMethod==='儲值金'){requireWalletOwner(d.settings);if(!customer)throw Error('儲值扣款請先選擇會員');if(walletBalance(customer.id,d.walletEntries)<order.total)throw Error('儲值餘額不足，未完成結帳');order.walletPaid=order.total;walletEntries=[...d.walletEntries,{id:'debit:'+order.id,customerId:customer.id,date:order.createdAt,amount:-order.total,kind:'consume',orderId:order.id}];}
+ order.receipt={amount:order.total,date:order.createdAt,method:order.paymentMethod};
+ let walletEntries=d.walletEntries;if(input.paymentMethod==='儲值金'){requireWalletOwner(d.settings);if(!customer)throw Error('儲值扣款請先選擇會員');if(walletBalance(customer.id,d.walletEntries)<order.total)throw Error('儲值餘額不足，未完成結帳');order.walletPaid=order.total;const parts=walletParts(customer.id,d.walletEntries);const principal=Math.min(parts.principal,order.total),bonus=round(order.total-principal);walletEntries=[...d.walletEntries,{id:'debit:'+order.id,customerId:customer.id,date:order.createdAt,amount:-order.total,principal:-principal,bonus:-bonus,kind:'consume',orderId:order.id}];}
  const tx=[order,...d.transactions];const logs=items.filter(i=>i.isProduct).map(i=>({id:id(),date:order.date,type:'銷售',itemId:i.id,itemName:i.name,qty:1,cost:i.cost,note:'訂單 #'+order.id.slice(0,8),operator:st.name}));
  const customers=customer?d.customers.map(c=>c.id===customer.id?{...c,visits:Number(c.visits||0)+1,totalSpend:money(Number(c.totalSpend||0)+order.total)}:c):d.customers;
  atomic({salon_wallet_entries:walletEntries,salon_transactions:tx,salon_services:services,salon_customers:customers,salon_inventory_logs:[...logs,...d.inventoryLogs],salon_pending_orders:d.pendingOrders.filter(o=>o.id!==input.pendingId),[DRAFT]:null});return order;
@@ -56,13 +57,14 @@ async function inventory(input){return transaction(d=>{
  const product=d.services.find(s=>s.id===input.id);if(!product)throw Error('商品已變更，請重新核對');const qty=Number(input.qty);if(!Number.isInteger(qty)||qty<=0)throw Error('數量需為大於0的整數');
  let stock=Number(product.stock||0),type,expense=null,cost=Number(product.cost||0),note=input.note||'';
  if(input.action==='restock'){stock+=qty;cost=money(input.cost);type='進貨';if(input.recordPayment)expense={id:id(),date:day(new Date()),type:'進貨付款',amount:money(cost*qty),note:product.name+' × '+qty+'；'+(input.supplier||''),inventoryPurchase:true};note='廠商：'+(input.supplier||'未指定')+'；'+note;}
- else if(input.action==='internal'){stock-=qty;type='領用';if(input.internalUseType==='designer'&&!d.stylists.some(s=>s.id===input.staffId))throw Error('請選擇領用人員');expense={id:id(),date:day(new Date()),type:'自領料(成本)',amount:money(cost*qty),note:product.name+' × '+qty+' '+note,relatedStaffId:input.internalUseType==='designer'?input.staffId:''};}
+ else if(input.action==='internal'){stock-=qty;type='領用';if(input.internalUseType==='designer'&&!d.stylists.some(s=>s.id===input.staffId))throw Error('請選擇領用人員');expense={id:id(),date:day(new Date()),type:'自領料(成本)',amount:money(cost*qty),note:product.name+' × '+qty+' '+note,relatedStaffId:input.internalUseType==='designer'?input.staffId:'',staffCharge:input.internalUseType==='designer'};}
  else if(input.action==='adjust'){stock+=input.adjustType==='inc'?qty:-qty;type=input.adjustType==='inc'?'盤點+':'盤點-';}else throw Error('不支援的庫存操作');
  if(stock<0)throw Error('庫存不足，未扣除任何數量');
  const log={id:id(),date:new Date().toISOString(),type,itemId:product.id,itemName:product.name,qty,cost,note,operator:input.staffId||'店內'};
  atomic({salon_services:d.services.map(s=>s.id===product.id?{...s,stock,cost}:s),salon_inventory_logs:[log,...d.inventoryLogs],...(expense?{salon_expenses:[...d.expenses,expense]}:{})});
 });}
-async function reviseOrder(updated,remove=false){return transaction(d=>{const old=d.transactions.find(t=>t.id===updated.id);if(!old)throw Error('找不到原單');if(old.voided)throw Error('此單已作廢，不能重複處理');d.customers=d.customers.map(customerRecord);if(old.sourceAppointment)throw Error('轉入單請先核對來源再更正');
+async function reviseOrder(updated,remove=false){if(updated.businessAction)return businessOrder(updated);return transaction(d=>{const old=d.transactions.find(t=>t.id===updated.id);if(!old)throw Error('找不到原單');if(old.voided)throw Error('此單已作廢，不能重複處理');d.customers=d.customers.map(customerRecord);if(old.sourceAppointment)throw Error('轉入單請先核對來源再更正');
+ assertSalaryOpen(d,old);if(old.businessVersion)throw Error('此單已啟用新帳本，請使用訂單收退款入口');
  if(old.walletPaid&&!remove)throw Error('儲值付款單請先作廢退回餘額，再重新開單，避免金額不一致');if(old.walletPaid)requireWalletOwner(d.settings);
  if(updated.expectedVersion&&updated.expectedVersion!==JSON.stringify(old))throw Error('這筆單據已在其他分頁修改，請重新開啟原單');
  const items=remove?[]:updated.items.map((i,index)=>{money(i.price);money(i.discount||0);if(itemAmount(i)<0)throw Error('折扣不能超過售價');const person=d.stylists.find(s=>String(s.id)===String(String(old.mainStylistId)!==String(updated.mainStylistId)?updated.mainStylistId:i.stylistId));if(!person)throw Error('請選擇有效設計師');return {...i,stylistId:person.id,stylistName:person.name,commissionRate:String(person.id)===String((old.items.find(o=>i.cartId&&o.cartId===i.cartId)||old.items[index]||i).stylistId)?i.commissionRate:(person.useGlobalCommission?Number(d.settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0))};});
@@ -73,21 +75,21 @@ async function reviseOrder(updated,remove=false){return transaction(d=>{const ol
  const {expectedVersion,...fields}=updated;const order={...fields,mainStylistId:updated.mainStylistId,items,total:Math.round(items.reduce((n,i)=>n+itemAmount(i),0)*100)/100};const tx=d.transactions.map(t=>t.id!==old.id?t:remove?{...old,voided:true,voidReason:updated.voidReason||'取消交易',voidedAt:new Date().toISOString(),history:[...(old.history||[]),{at:new Date().toISOString(),action:'作廢',total:old.total}]}:{...order,history:[...(old.history||[]),{at:new Date().toISOString(),action:'修改',before:{...old,history:undefined}}]});
  const customers=d.customers.map(c=>{let visits=Number(c.visits||0),total=Number(c.totalSpend||0);if(c.id===old.customerId){visits--;total-=Number(old.total||0);}if(!remove&&c.id===order.customerId){visits++;total+=order.total;}return {...c,visits:Math.max(0,visits),totalSpend:Math.max(0,Math.round(total*100)/100)};});
  const logs=Object.entries(delta).filter(([,q])=>q).map(([key,q])=>({id:id(),date:new Date().toISOString(),type:q>0?'退單回補':'訂單更正',itemId:key,itemName:d.services.find(s=>String(s.id)===key)?.name,qty:Math.abs(q),note:'訂單 #'+old.id.slice(0,8),operator:'訂單管理'}));
- atomic({...(old.walletPaid?{salon_wallet_entries:[...d.walletEntries,{id:'refund:'+old.id,customerId:old.customerId,date:new Date().toISOString(),amount:old.walletPaid,kind:'refund',orderId:old.id}]}:{}),salon_transactions:tx,salon_customers:customers,salon_services:services,salon_inventory_logs:[...logs,...d.inventoryLogs],[PREFIX+'last-order-change']:{before:old,at:new Date().toISOString(),removed:remove}});return order;
+ atomic({...(old.walletPaid?{salon_wallet_entries:[...d.walletEntries,{id:'refund:'+old.id,customerId:old.customerId,date:new Date().toISOString(),amount:old.walletPaid,principal:-(d.walletEntries.find(e=>e.kind==='consume'&&same(e.orderId,old.id))?.principal??-old.walletPaid),bonus:-(d.walletEntries.find(e=>e.kind==='consume'&&same(e.orderId,old.id))?.bonus||0),kind:'refund',orderId:old.id}]}:{}),salon_transactions:tx,salon_customers:customers,salon_services:services,salon_inventory_logs:[...logs,...d.inventoryLogs],[PREFIX+'last-order-change']:{before:old,at:new Date().toISOString(),removed:remove}});return order;
 });}
 function backupPayload(){return {...all(),draft:draftRead(),lastUpdated:new Date().toISOString(),format:'salon-pos-backup-v2'};}
 function validateBackup(data){
  if(!data||typeof data.settings!=='object'||Array.isArray(data.settings)||!data.settings)throw Error('不是完整的 POS 備份，未覆蓋任何資料');
  for(const key of ['transactions','customers','services','stylists'])if(!Array.isArray(data[key]))throw Error('備份缺少 '+key+'，未覆蓋任何資料');
- for(const key of ['transactions','customers','services','stylists','expenses','inventoryLogs','pendingOrders','walletEntries']){if(data[key]!==undefined&&!Array.isArray(data[key]))throw Error(key+'資料格式錯誤');const ids=new Set();for(const row of data[key]||[]){if(!row||row.id===undefined||row.id===null||String(row.id)===''||ids.has(String(row.id)))throw Error(key+' 包含缺少或重複的識別碼');ids.add(String(row.id));}}
+ for(const key of ['transactions','customers','services','stylists','expenses','inventoryLogs','pendingOrders','walletEntries','businessEvents']){if(data[key]!==undefined&&!Array.isArray(data[key]))throw Error(key+'資料格式錯誤');const ids=new Set();for(const row of data[key]||[]){if(!row||row.id===undefined||row.id===null||String(row.id)===''||ids.has(String(row.id)))throw Error(key+' 包含缺少或重複的識別碼');ids.add(String(row.id));}}
  for(const e of data.walletEntries||[]){if(!e.customerId||!Number.isFinite(Number(e.amount))||!['topup','consume','refund'].includes(e.kind)||!dateTime(e.date))throw Error('儲值紀錄不完整');}
  for(const c of data.customers){if(typeof(c.name||c.Name)!=='string'||!(c.name||c.Name).trim())throw Error('備份包含不完整顧客資料');const n=customerRecord(c);money(n.totalSpend);if(!Number.isInteger(n.visits)||n.visits<0)throw Error('顧客累積次數格式錯誤');}
  for(const t of data.transactions){if(!dateTime(t.date)||!Array.isArray(t.items)||!t.items.length)throw Error('備份訂單缺少日期或明細，未覆蓋任何資料');money(t.total);for(const i of t.items){if(!i||!Number.isFinite(Number(i.price)))throw Error('訂單明細金額不完整');if(itemAmount(i)<0)throw Error('訂單折扣超過售價');money(i.cost||0);}}
  for(const e of data.expenses||[]){money(e.amount);if(!dateTime(e.date))throw Error('支出日期不完整');}
- return data;
+ validateBusiness(data);return data;
 }
 async function restore(data){validateBackup(data);return transaction(()=>{
- const existingWallet=all().walletEntries;for(const entry of existingWallet){if(!(data.walletEntries||[]).some(e=>e.id===entry.id&&equivalent(e,entry)))throw Error('此備份缺少已發生的儲值紀錄，為防止重複花用，禁止還原。請使用包含最新儲值紀錄的完整備份');}
+ const current=all();for(const entry of current.businessEvents){if(!(data.businessEvents||[]).some(e=>e.id===entry.id&&equivalent(e,entry)))throw Error('備份缺少或變更既有營運帳本，已停止還原');}const existingWallet=current.walletEntries;for(const entry of existingWallet){if(!(data.walletEntries||[]).some(e=>e.id===entry.id&&equivalent(e,entry)))throw Error('此備份缺少已發生的儲值紀錄，為防止重複花用，禁止還原。請使用包含最新儲值紀錄的完整備份');}
  // Compact only this POS's existing values, replacing each with equivalent data.
  // This also reclaims oversized snapshots left by a previous failed restore.
  for(const key of [...Object.values(DATA),DRAFT,PREFIX+'before-restore']){const raw=localStorage.getItem(key);if(raw){const packed=codec.stringify(codec.parse(raw));if(packed.length<raw.length)localStorage.setItem(key,packed);}}
@@ -104,10 +106,11 @@ function status(state,message,extra={}){cloudState={state,message,...extra};emit
 function cloudURL(settings){if(!settings.shopID?.trim()||!settings.syncToken?.trim())throw Error('請先設定店號與同步金鑰');return 'https://firestore.googleapis.com/v1/projects/salonpos-system/databases/(default)/documents/SalonPOS/'+encodeURIComponent(settings.shopID.trim())+'/Tokens/'+encodeURIComponent(settings.syncToken.trim());}
 function cloudMetaKey(settings){return PREFIX+'cloud:'+settings.shopID.trim()+':'+settings.syncToken.trim();}
 function protectCloud(local,remote){
- for(const [key,label]of Object.entries({transactions:'訂單',customers:'顧客',expenses:'支出',inventoryLogs:'庫存紀錄',walletEntries:'儲值紀錄',services:'服務與商品',stylists:'人員'})){
+ for(const [key,label]of Object.entries({transactions:'訂單',customers:'顧客',expenses:'支出',inventoryLogs:'庫存紀錄',walletEntries:'儲值紀錄',businessEvents:'營運帳本',services:'服務與商品',stylists:'人員'})){
   const here=local[key]||[],there=remote[key]||[];
   if(here.length<there.length)throw Error('防誤覆蓋：本機'+label+' '+here.length+' 筆，少於雲端 '+there.length+' 筆，已停止上傳。請先下載恢復雲端資料');
   const ids=new Set(here.filter(r=>r?.id!==undefined&&r.id!==null).map(r=>String(r.id)));
+  if(['businessEvents','walletEntries'].includes(key)&&there.some(r=>!here.some(h=>String(h.id)===String(r.id)&&equivalent(h,r))))throw Error('防誤覆蓋：既有帳本紀錄不能變更');
   if(there.some(r=>r?.id!==undefined&&r.id!==null&&!ids.has(String(r.id))))throw Error('防誤覆蓋：本機缺少雲端原有的'+label+'，即使總筆數較多也不能覆蓋。請先下載恢復雲端資料');
  }
 }
@@ -202,10 +205,11 @@ function mergeData(base,local,remote){
  const b=new Map((base?.[key]||[]).map(r=>[String(r.id),r])),l=new Map((local[key]||[]).map(r=>[String(r.id),r])),r=new Map((remote[key]||[]).map(r=>[String(r.id),r]));out[key]=[];
  for(const k of new Set([...r.keys(),...l.keys(),...b.keys()])){let bv=b.get(k),lv=l.get(k),rv=r.get(k),v;if(key==='customers'){if(bv)bv=customerRecord(bv);if(lv)lv=customerRecord(lv);if(rv)rv=customerRecord(rv);}
  if(key==='services'&&bv?.isProduct&&lv&&rv&&lv.stock!==bv.stock&&rv.stock!==bv.stock&&!equivalent(local.transactions,remote.transactions))throw Error('同步暫停：同一商品在兩台裝置異動庫存，請核對');
+ if(bv&&['businessEvents','walletEntries'].includes(key)&&((lv&&!equivalent(lv,bv))||(rv&&!equivalent(rv,bv))))throw Error('同步暫停：既有帳本不可修改');
  if(equivalent(lv,rv)){v=lv;}else if(!bv){if(lv&&rv&&!equivalent(lv,rv))throw Error('同步暫停：'+key+' 有同一識別碼的不同內容，請先核對');v=lv||rv;}
  else if(key==='customers'&&lv&&rv){const counts={};for(const f of ['visits','totalSpend']){const aliases={visits:'Visits',totalSpend:'TotalSpend'};counts[f]=Math.round((Number(lv[f]??lv[aliases[f]]??0)+Number(rv[f]??rv[aliases[f]]??0)-Number(bv[f]??bv[aliases[f]]??0))*100)/100;}
  const strip=x=>Object.fromEntries(Object.entries(customerRecord(x)).filter(([f])=>!['visits','totalSpend','Visits','TotalSpend'].includes(f)));v={...mergeValue(strip(bv),strip(lv),strip(rv),key+'.'+k),...counts};}
- else if(['transactions','walletEntries','services'].includes(key)&&lv&&rv&&!equivalent(lv,rv)&&!equivalent(lv,bv)&&!equivalent(rv,bv))throw Error('同步暫停：同一筆單據、庫存或儲值有雙方修改，請核對後再同步');
+ else if(['transactions','walletEntries','businessEvents','services'].includes(key)&&lv&&rv&&!equivalent(lv,rv)&&!equivalent(lv,bv)&&!equivalent(rv,bv))throw Error('同步暫停：同一筆單據、庫存或儲值有雙方修改，請核對後再同步');
  else v=mergeValue(bv,lv,rv,key+'.'+k);
  if(v)out[key].push(v);else if(key!=='pendingOrders'&&bv)throw Error('同步暫停：不允許移除既有紀錄，請使用封存或作廢');
  }
@@ -235,7 +239,7 @@ async function cloudSync(force=false){
  if(tips.length>1){const parents=new Set(tips.map(v=>v.fields?.parentVersion?.stringValue));if(parents.size!==1)throw Error('多台裝置產生不同版本分支，已保留所有資料，請管理者核對後合併');const parent=[...parents][0]?.split(':')[0];if(!parent||parent==='none')throw Error('初次備份有多台裝置同時建立，請先核對版本');const common=await cloudDownload(settings,parent);let aggregate=common;for(const tip of tips){const data=await cloudDownload(settings,tip.versionId);aggregate=mergeData(common,aggregate,data);}remote=aggregate;}
  let merged;
  if(!remote)merged=local;
- else if(!base&&!local.transactions.length&&!local.customers.length&&!local.expenses.length&&!local.inventoryLogs.length&&!local.walletEntries.length)merged={...remote,settings:{...remote.settings,...Object.fromEntries(deviceKeys.filter(k=>settings[k]!==undefined).map(k=>[k,settings[k]]))},draft:local.draft};
+ else if(!base&&!local.transactions.length&&!local.customers.length&&!local.expenses.length&&!local.inventoryLogs.length&&!local.walletEntries.length&&!local.businessEvents.length)merged={...remote,settings:{...remote.settings,...Object.fromEntries(deviceKeys.filter(k=>settings[k]!==undefined).map(k=>[k,settings[k]]))},draft:local.draft};
  else merged=mergeData(base,local,remote);
  merged.settings={...merged.settings,autoSync:settings.autoSync??true,autoCloudBackup:settings.autoCloudBackup??false,autoBackup:settings.autoBackup??false,shopID:settings.shopID,syncToken:settings.syncToken};
  if(revision!==start||interactionBusy()) {status('pending','操作中 · 下一輪再同步');return;}
@@ -254,16 +258,123 @@ function walletOwnerId(){let key=PREFIX+'wallet-device',v=localStorage.getItem(k
 function requireWalletOwner(settings){if(!settings.walletDeviceId||settings.walletDeviceId!==walletOwnerId())throw Error('儲值扣款僅限指定收銀裝置，其他裝置可查看；避免兩台離線重複扣款');}
 async function claimWalletDevice(){const settings=read(DATA.settings,{}),owner=walletOwnerId();if(!settings.shopID||!settings.syncToken)throw Error('請先連接雲端，再指定唯一儲值收銀裝置');const url=cloudURL(settings)+'/Backups/wallet-owner-v1';let response=await cloudFetch(url,{cache:'no-store'});if(response.status===404){const create=await cloudFetch(url+'?currentDocument.exists=false',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{kind:{stringValue:'legacy-snapshot'},content:{stringValue:JSON.stringify({format:'salon-wallet-owner-v1',owner})}}})});if(!create.ok&&create.status!==409)await responseJSON(create);response=await cloudFetch(url,{cache:'no-store'});}const doc=await responseJSON(response);if(JSON.parse(doc.fields.content.stringValue).owner!==owner)throw Error('雲端已指定另一台儲值收銀裝置，這台僅能查看餘額');return transaction(d=>atomic({[DATA.settings]:{...d.settings,walletDeviceId:owner}}));}
 function walletBalance(customerId,entries=all().walletEntries){return Math.round(entries.filter(e=>String(e.customerId)===String(customerId)).reduce((n,e)=>n+Number(e.amount||0),0)*100)/100;}
-function walletTopup(input){return transaction(d=>{requireWalletOwner(d.settings);const existing=d.walletEntries.find(e=>e.id===input.id);if(existing)return existing;if(!d.customers.some(c=>!c.archived&&String(c.id)===String(input.customerId)))throw Error('請選擇有效會員');const amount=money(input.amount);if(!amount)throw Error('儲值金額需大於零');const entry={id:input.id||id(),customerId:input.customerId,date:new Date().toISOString(),amount,kind:'topup',paymentMethod:input.paymentMethod||'現金',note:input.note||''};atomic({[DATA.walletEntries]:[...d.walletEntries,entry]});return entry;});}
+function walletTopup(input){return transaction(d=>{requireWalletOwner(d.settings);const existing=d.walletEntries.find(e=>e.id===input.id);if(existing)return existing;if(!d.customers.some(c=>!c.archived&&String(c.id)===String(input.customerId)))throw Error('請選擇有效會員');const amount=money(input.amount);if(!amount)throw Error('儲值金額需大於零');const bonus=money(input.bonus||0);const entry={id:input.id||id(),customerId:input.customerId,date:new Date().toISOString(),amount:round(amount+bonus),principal:amount,bonus,kind:'topup',paymentMethod:input.paymentMethod||'現金',note:input.note||''};atomic({[DATA.walletEntries]:[...d.walletEntries,entry]});return entry;});}
 function lineFinancials(item,settings={},staff={}){const amount=Number(item.price||0)-Number(item.discount||0),cost=itemCost(item,amount),assistant=Number(item.assistantFee||0),net=amount-cost-(item.isProduct?0:assistant);const rate=Number(item.commissionRate??(staff.useGlobalCommission?settings.commissionRates?.[item.category]:staff.commissionRate)??0);const base=item.commissionModel==='net-v2'?net:amount-((item.deductCost??settings.deductCostBeforeCommission)?cost:0);return {amount,cost,assistant,net,commission:Math.round(Math.max(0,base)*rate/100)};}
 function financials(tx,expenses,staff,settings,monthly){const rows=staff.map(s=>({...s,serviceRevenue:0,productRevenue:0,realRevenue:0,materialCost:0,assistantCost:0,serviceCommission:0,productCommission:0,assistantCommission:0,visits:0})),byId=new Map(rows.map(s=>[String(s.id),s]));let revenue=0,cost=0,serviceRevenue=0,realRevenue=0;
  for(const t of tx.filter(t=>!t.voided)){revenue+=Number(t.total||0);const seen=new Set();for(const item of t.items||[]){const person=byId.get(String(item.stylistId)),f=lineFinancials(item,settings,person||{});cost+=f.cost;if(!item.isProduct){serviceRevenue+=f.amount;realRevenue+=f.net;}if(person){if(item.isProduct){person.productRevenue+=f.amount;person.productCommission+=f.commission;}else{person.serviceRevenue+=f.amount;person.realRevenue+=f.net;person.materialCost+=f.cost;person.assistantCost+=f.assistant;person.serviceCommission+=f.commission;}seen.add(String(person.id));}const assistant=byId.get(String(item.assistantId));if(assistant)assistant.assistantCommission+=f.assistant;}for(const k of seen)byId.get(k).visits++;}
  for(const s of rows){s.advanceTotal=expenses.filter(e=>!e.archived&&e.type==='員工借支'&&String(e.staffId||e.relatedStaffId)===String(s.id)).reduce((n,e)=>n+Number(e.amount||0),0);s.totalCommission=s.serviceCommission+s.productCommission+s.assistantCommission;s.fixedPay=monthly?Number(s.baseSalary||0)+Number(s.positionBonus||0)+Number(s.attendanceBonus||0):0;s.totalSalary=s.fixedPay+s.totalCommission-s.advanceTotal;}
  const cashExpense=expenses.filter(e=>!e.archived).reduce((n,e)=>n+Number(e.amount||0),0),operatingExpense=expenses.filter(e=>!e.archived&&!e.inventoryPurchase&&!['進貨付款','員工借支','薪資發放'].includes(e.type)).reduce((n,e)=>n+Number(e.amount||0),0),salaryCost=rows.reduce((n,s)=>n+s.totalSalary+s.advanceTotal,0);return {rows,revenue,cost,serviceRevenue,realRevenue,cashExpense,operatingExpense,salaryCost,profit:revenue-cost-operatingExpense-salaryCost};}
 
+// Business integration: append-only events; no production cloud migration on load.
+const round=n=>Math.round((Number(n)+Number.EPSILON)*100)/100;
+const same=(a,b)=>String(a)===String(b);
+function signed(v){if(v===''||v==null||!Number.isFinite(Number(v))||Math.abs(Number(v))>10000000)throw Error('金額格式錯誤');return round(v);}
+function reasonText(v){if(!String(v||'').trim())throw Error('請填寫原因或說明');return String(v).trim();}
+function validDay(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v||'')||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)throw Error('日期不正確');return v;}
+function monthBounds(m){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(m||''))throw Error('請選擇月份');return {from:m+'-01',to:new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5)),0)).toISOString().slice(0,10)};}
+function orderReceipt(o){if(o.receipt)return o.receipt;const first=(o.history||[]).find(h=>h.before)?.before||o;return {amount:Number(first.total||0),date:first.createdAt||first.date,method:first.paymentMethod,estimated:true};}
+function businessDue(o,events=all().businessEvents){const paid=Number(orderReceipt(o).amount)+events.filter(e=>e.kind==='settlement'&&same(e.orderId,o.id)).reduce((n,e)=>n+Number(e.amount),0);return round((o.voided?0:Number(o.total))-paid+(o.walletRefunded||0));}
+function vipDiscount(customer,item,settings=all().settings){if(!customer||item.isProduct&&!settings.vipIncludeProducts)return 0;const tiers=(settings.vipTiers||[]).filter(t=>!t.disabled&&Number(customer.totalSpend||0)>=Number(t.threshold||0)).sort((a,b)=>Number(b.threshold)-Number(a.threshold));const tier=customer.vipTierId==='none'?null:customer.vipTierId?(settings.vipTiers||[]).find(t=>t.id===customer.vipTierId&&!t.disabled):tiers[0];if(!tier)return 0;const pct=money(tier.discountPercent);if(pct>100)throw Error('會員優惠百分比錯誤');return round(Number(item.price)*pct/100);}
+function walletParts(customerId,entries=all().walletEntries){let principal=0,bonus=0;for(const e of entries.filter(e=>same(e.customerId,customerId))){principal+=Number(e.principal??e.amount);bonus+=Number(e.bonus||0);}return {principal:round(principal),bonus:round(bonus),total:round(principal+bonus)};}
+function appendEvent(d,event,extra={}){atomic({...extra,[DATA.businessEvents]:[...d.businessEvents,event]});return event;}
+function checkExpected(o,expected){if(!o||!expected||JSON.stringify(o)!==expected)throw Error('訂單已變更，請關閉後重新核對');}
+function assertSalaryOpen(d,o){const month=day(o.date).slice(0,7),people=new Set((o.items||[]).flatMap(i=>[String(i.stylistId),String(i.assistantId)]));if(d.settings.payrollLocks?.[month]||d.businessEvents.some(e=>e.kind==='salary'&&e.month===month&&people.has(String(e.staffId))))throw Error('此月份薪資已鎖定／結算，不能直接改動原單；請先由管理者核對');}
+function businessOrder(input){return transaction(d=>{
+ const duplicate=d.businessEvents.find(e=>e.id===input.operationId);if(duplicate)return duplicate;
+ if(!input.operationId)throw Error('缺少操作識別碼');const old=d.transactions.find(t=>same(t.id,input.id));checkExpected(old,input.expectedVersion);if(old.voided)throw Error('已作廢單據不能重複修改');if(old.sourceAppointment)throw Error('預約轉入單請先核對來源，暫不更正');assertSalaryOpen(d,old);
+ const action=input.businessAction,reason=reasonText(input.reason),now=new Date().toISOString();let items=JSON.parse(JSON.stringify(old.items)),returns=[];
+ const targetStaff=input.mainStylistId||old.mainStylistId;
+ if(action==='edit'){
+  if(old.walletPaid)throw Error('儲值訂單請以退貨或作廢處理，不可直接改價');
+  items=input.items.map((i,n)=>{const original=old.items.find((x,k)=>(x.cartId||old.id+'-line-'+k)===(i.cartId||old.id+'-line-'+n));if(!original)throw Error('更正時不能新增未知項目');const person=d.stylists.find(s=>same(s.id,same(targetStaff,old.mainStylistId)?i.stylistId:targetStaff));if(!person)throw Error('請選擇有效人員');const price=money(i.price),discount=money(i.discount||0);if(discount>price)throw Error('折扣不能大於售價');return {...original,cartId:i.cartId,price,discount,stylistId:person.id,stylistName:person.name,commissionRate:same(person.id,original.stylistId)?original.commissionRate:(person.useGlobalCommission?Number(d.settings.commissionRates?.[i.category]||0):Number(person.commissionRate||0))};});
+  if(!items.length)throw Error('整單取消請使用作廢');if(new Set(items.map(i=>i.cartId)).size!==items.length)throw Error('項目重複');
+  // Deleting products must use explicit return flow, not an implicit stock increase.
+  if(old.items.filter(i=>i.isProduct).length!==items.filter(i=>i.isProduct).length)throw Error('刪除商品請使用部分商品退貨，選擇回庫或報廢');
+ }else if(action==='return'){
+  const selected=new Set(input.lineIds||[]);if(!selected.size)throw Error('請勾選退貨商品');
+  returns=old.items.map((i,n)=>({...i,lineId:i.cartId||old.id+'-line-'+n})).filter(i=>selected.has(i.lineId));
+  if(returns.length!==selected.size||returns.some(i=>!i.isProduct))throw Error('只能選擇原單尚未退貨的商品');
+  items=old.items.filter((i,n)=>!selected.has(i.cartId||old.id+'-line-'+n));if(!items.length)throw Error('全部項目退回請使用整單作廢');
+ }else if(action==='void'){returns=old.items.filter(i=>i.isProduct);items=[];}else throw Error('不支援的單據操作');
+ const total=round(items.reduce((n,i)=>n+itemAmount(i),0));let next={...old,receipt:orderReceipt(old),businessVersion:1,items:action==='void'?old.items:items,total:action==='void'?old.total:total};
+ if(action==='edit'){if(!dateTime(input.date))throw Error('日期不正確');next.date=input.date;next.mainStylistId=targetStaff;next.customerName=input.customerName||old.customerName;if(input.customerId!==old.customerId){if(!d.customers.some(c=>same(c.id,input.customerId)&&!c.archived))throw Error('會員資料無效');next.customerId=input.customerId;}assertSalaryOpen(d,next);}
+ if(action==='void')Object.assign(next,{voided:true,voidReason:reason,voidedAt:now});
+ const delta=action==='void'?-Number(old.total):total-Number(old.total);
+ let services=d.services,logs=d.inventoryLogs;
+ if(returns.length){const quantities={};returns.forEach(i=>quantities[i.id]=(quantities[i.id]||0)+1);if(input.returnStock){for(const k of Object.keys(quantities))if(!services.some(p=>same(p.id,k)))throw Error('原商品已不存在，無法回庫');services=services.map(p=>quantities[p.id]?{...p,stock:Number(p.stock||0)+quantities[p.id]}:p);}
+ logs=[...returns.map(i=>({id:id(),date:now,type:input.returnStock?'退貨回庫':'退貨報廢',itemId:i.id,itemName:i.name,qty:1,cost:itemCost(i,itemAmount(i)),orderId:old.id,note:reason,operator:'訂單管理'})),...logs];}
+ const customers=d.customers.map(customerRecord).map(c=>{let amount=c.totalSpend,visits=c.visits;if(same(c.id,old.customerId)){amount-=Number(old.total);visits--;}if(action!=='void'&&same(c.id,next.customerId)){amount+=total;visits++;}return {...c,totalSpend:Math.max(0,round(amount)),visits:Math.max(0,visits)};});
+ next.history=[...(old.history||[]),{at:now,action:action==='edit'?'修改':action==='return'?'商品退貨':'作廢',reason,before:{...old,history:undefined},afterTotal:action==='void'?0:total}];
+ const event={id:input.operationId,kind:'orderChange',orderId:old.id,date:now,action,reason,amount:delta,returnedCost:round(returns.reduce((n,i)=>n+itemCost(i,itemAmount(i)),0)),returnStock:!!input.returnStock,lineIds:input.lineIds||[]};
+ appendEvent(d,event,{[DATA.transactions]:d.transactions.map(t=>same(t.id,old.id)?next:t),[DATA.customers]:customers,[DATA.services]:services,[DATA.inventoryLogs]:logs});return next;
+});}
+function settleOrder(input){return transaction(d=>{
+ const previous=d.businessEvents.find(e=>e.id===input.id);if(previous)return previous;
+ const o=d.transactions.find(t=>same(t.id,input.orderId));checkExpected(o,input.expectedVersion);const due=businessDue(o,d.businessEvents);if(!due||signed(input.amount)!==due)throw Error('待補收／退款金額已變更，請重新核對');const reason=reasonText(input.reason),date=validDay(input.date);let wallets=d.walletEntries,method=input.method;
+ if(o.receipt?.estimated&&input.confirmLegacy!==true)throw Error('舊單缺少實際收款快照，請先核對原款已收取');
+ if(o.paymentMethod==='儲值金'){
+  requireWalletOwner(d.settings);if(due>0)throw Error('儲值訂單不可另外補收，請重新開單');method='儲值金';
+  const debit=wallets.find(e=>e.kind==='consume'&&same(e.orderId,o.id));if(!debit)throw Error('找不到原儲值扣款紀錄，請核對');const prior=wallets.filter(e=>e.kind==='refund'&&same(e.orderId,o.id));
+  const bonusLeft=round(-Number(debit.bonus||0)-prior.reduce((n,e)=>n+Number(e.bonus||0),0)),principalLeft=round(-Number(debit.principal??debit.amount)-prior.reduce((n,e)=>n+Number(e.principal??e.amount),0));if(-due>round(bonusLeft+principalLeft))throw Error('退款超過原儲值扣款');const bonus=Math.min(-due,bonusLeft),principal=round(-due-bonus);
+  wallets=[...wallets,{id:'refund:'+input.id,kind:'refund',orderId:o.id,customerId:o.customerId,date:date+'T12:00:00+08:00',amount:-due,principal,bonus}];
+ }else if(!method||method==='儲值金')throw Error('請選擇實際收退款方式');
+ const event={id:input.id||id(),kind:'settlement',orderId:o.id,amount:due,date:date+'T12:00:00+08:00',method,reason,version:JSON.stringify(o)};
+ return appendEvent(d,event,{[DATA.walletEntries]:wallets});
+});}
+function recordWork(input){return transaction(d=>{
+ if(d.businessEvents.some(e=>e.id===input.id))return;const person=d.stylists.find(s=>same(s.id,input.staffId)&&!s.archived);if(!person)throw Error('請選擇人員');const date=validDay(input.date),hours=Number(input.hours),rate=money(input.rate);if(!Number.isFinite(hours)||hours<=0||hours>24)throw Error('工時需大於0且不超過24小時');
+ if(d.businessEvents.some(e=>e.kind==='salary'&&same(e.staffId,person.id)&&e.month===date.slice(0,7)))throw Error('本月已結算，不能再登記工時');
+ return appendEvent(d,{id:input.id||id(),kind:'work',staffId:person.id,date,hours,rate,amount:round(hours*rate),reason:input.reason||'工時登記'});
+});}
+function salaryDraft(staffId,month,d=all()){
+ const bounds=monthBounds(month),person=d.stylists.find(s=>same(s.id,staffId));if(!person)throw Error('找不到人員');
+ const tx=d.transactions.filter(t=>!t.voided&&day(t.date)>=bounds.from&&day(t.date)<=bounds.to),rows=financials(tx,[],d.stylists,d.settings,true).rows;
+ const oldLock=d.settings.payrollLocks?.[month]?.rows?.find(s=>same(s.id,staffId)),base=oldLock||rows.find(s=>same(s.id,staffId));
+ const salaries=d.businessEvents.filter(e=>e.kind==='salary'),usedAdvances=new Set(salaries.flatMap(e=>e.advanceIds||[])),usedCharges=new Set(salaries.flatMap(e=>e.chargeIds||[]));
+ const advances=d.expenses.filter(e=>!e.archived&&e.type==='員工借支'&&same(e.staffId||e.relatedStaffId,staffId)&&day(e.date)<=bounds.to&&!usedAdvances.has(String(e.id)));
+ const charges=d.expenses.filter(e=>!e.archived&&e.staffCharge&&same(e.relatedStaffId,staffId)&&day(e.date)<=bounds.to&&!usedCharges.has(String(e.id)));
+ const work=d.businessEvents.filter(e=>e.kind==='work'&&same(e.staffId,staffId)&&day(e.date).startsWith(month));
+ const fixed=oldLock?Number(base.fixedPay??(Number(base.baseSalary||0)+Number(base.positionBonus||0)+Number(base.attendanceBonus||0))):person.salaryMode==='hourly'?work.reduce((n,e)=>n+e.amount,0):person.salaryMode==='commission'?0:Number(base.fixedPay||0);
+ const gross=round(fixed+Number(base.serviceCommission||0)+Number(base.productCommission||0)+Number(base.assistantCommission||0)),advance=oldLock?Number(base.advanceTotal||0):round(advances.reduce((n,e)=>n+Number(e.amount),0)),charge=round(charges.reduce((n,e)=>n+Number(e.amount),0));
+ return {staffId:person.id,name:person.name,month,fixed,gross,advance,charge,net:round(gross-advance-charge),serviceCommission:base.serviceCommission||0,productCommission:base.productCommission||0,assistantCommission:base.assistantCommission||0,serviceRevenue:base.serviceRevenue||0,realRevenue:base.realRevenue,advanceIds:advances.map(e=>String(e.id)),chargeIds:charges.map(e=>String(e.id)),workIds:work.map(e=>e.id),legacyLock:!!oldLock};
+}
+function saveSalary(input){return transaction(d=>{
+ const key='salary:'+input.month+':'+input.staffId;if(d.businessEvents.some(e=>e.id===key))throw Error('此人員本月已結算');const draft=salaryDraft(input.staffId,input.month,d);if(JSON.stringify(draft)!==input.expected)throw Error('薪資資料已變更，請重新試算');const adjustment=signed(input.adjustment||0);if(adjustment)reasonText(input.reason);
+ return appendEvent(d,{...draft,id:key,kind:'salary',date:new Date().toISOString(),adjustment,reason:input.reason||'核對結算',net:round(draft.net+adjustment)});
+});}
+function paySalary(input){return transaction(d=>{const slip=d.businessEvents.find(e=>e.id===input.salaryId&&e.kind==='salary');if(!slip)throw Error('請先確認薪資條');const key='salary-pay:'+slip.id;if(d.businessEvents.some(e=>e.id===key))return;const date=validDay(input.date),method=reasonText(input.method);if(slip.net<0)throw Error('薪資為負數，請先核對更正');return appendEvent(d,{id:key,kind:'salaryPay',salaryId:slip.id,staffId:slip.staffId,date,amount:slip.net,method,reason:'薪資實際付款'}, {[DATA.expenses]:[...d.expenses,{id:key,date,amount:slip.net,type:'薪資發放',staffId:slip.staffId,salaryEventId:key,note:slip.month+' '+slip.name}]});});}
+function correctSalary(input){return transaction(d=>{if(d.businessEvents.some(e=>e.id===input.id))return;const slip=d.businessEvents.find(e=>e.id===input.salaryId&&e.kind==='salary');if(!slip||!d.businessEvents.some(e=>e.kind==='salaryPay'&&e.salaryId===slip.id))throw Error('本次更正限已付薪資');const amount=signed(input.amount);if(!amount)throw Error('請填補發正數或收回負數');const date=validDay(input.date),reason=reasonText(input.reason);return appendEvent(d,{id:input.id||id(),kind:'salaryCorrection',salaryId:slip.id,staffId:slip.staffId,date,amount,method:reasonText(input.method),reason});});}
+function businessCash(d=all(),from='',to='9999-12-31'){
+ const rows=[];for(const o of d.transactions){if(o.paymentMethod==='儲值金'||o.voided&&!o.receipt)continue;const r=orderReceipt(o);rows.push({id:'receipt:'+o.id,date:r.date,amount:r.amount,method:r.method,reason:'訂單收款',estimated:!!r.estimated,orderId:o.id});}
+ for(const e of d.businessEvents)if(e.kind==='settlement'&&e.method!=='儲值金')rows.push(e);else if(e.kind==='salaryCorrection')rows.push({...e,amount:-e.amount,reason:'薪資更正 · '+e.reason});
+ for(const e of d.walletEntries)if(e.kind==='topup')rows.push({id:e.id,date:e.date,amount:e.principal??e.amount,method:e.paymentMethod,reason:'儲值本金收款'});
+ for(const e of d.expenses)if(!e.archived)rows.push({id:'expense:'+e.id,date:e.date,amount:-e.amount,reason:e.type,method:e.paymentMethod||'未記錄'});
+ return rows.filter(e=>day(e.date)>=from&&day(e.date)<=to).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function monthlyBusiness(month,d=all()){
+ const {from,to}=monthBounds(month),tx=d.transactions.filter(t=>!t.voided&&day(t.date)>=from&&day(t.date)<=to),expenses=d.expenses.filter(e=>day(e.date)>=from&&day(e.date)<=to&&!e.archived);
+ const f=financials(tx,expenses,d.stylists,d.settings,true);let salaryCost=0;
+ for(const s of d.stylists){const saved=d.businessEvents.find(e=>e.kind==='salary'&&same(e.staffId,s.id)&&e.month===month);salaryCost+=saved?saved.gross+saved.adjustment:salaryDraft(s.id,month,d).gross;}
+ const corrections=d.businessEvents.filter(e=>e.kind==='salaryCorrection'&&day(e.date).startsWith(month)).reduce((n,e)=>n+e.amount,0);salaryCost+=corrections;
+ const loss=d.businessEvents.filter(e=>e.kind==='orderChange'&&!e.returnStock&&day(e.date).startsWith(month)).reduce((n,e)=>n+Number(e.returnedCost||0),0);
+ const stockLoss=d.inventoryLogs.filter(e=>e.type==='盤點-'&&day(e.date).startsWith(month)).reduce((n,e)=>n+Number(e.cost||0)*Number(e.qty||0),0);
+ const operating=expenses.filter(e=>!e.inventoryPurchase&&!e.salaryEventId&&!['進貨付款','員工借支','薪資發放'].includes(e.type)).reduce((n,e)=>n+Number(e.amount),0);
+ const gift=d.walletEntries.filter(e=>e.kind==='consume'&&tx.some(t=>same(t.id,e.orderId))).reduce((n,e)=>{const refunded=d.walletEntries.filter(r=>r.kind==='refund'&&same(r.orderId,e.orderId)).reduce((a,r)=>a+Number(r.bonus||0),0);return n+Math.max(0,-Number(e.bonus||0)-refunded);},0);
+ const cash=businessCash(d,from,to);return {...f,salaryCost:round(salaryCost),loss:round(loss+stockLoss),gift:round(gift),operatingExpense:round(operating),profit:round(f.revenue-f.cost-salaryCost-operating-loss-stockLoss-gift),cash:round(cash.reduce((n,e)=>n+Number(e.amount),0)),cashRows:cash,estimated:cash.some(e=>e.estimated)};
+}
+function validateBusiness(data){
+ const events=data.businessEvents||[],kinds=new Set(['orderChange','settlement','work','salary','salaryPay','salaryCorrection']);
+ for(const e of events){if(!kinds.has(e.kind)||!dateTime(e.date))throw Error('營運帳本種類或日期不完整');if(e.amount!==undefined)signed(e.amount);if(['orderChange','settlement'].includes(e.kind)&&!(data.transactions||[]).some(t=>same(t.id,e.orderId)))throw Error('營運帳本找不到原單');if(e.kind==='salary')for(const k of ['gross','net','advance','charge','adjustment'])signed(e[k]);}
+ const pays=new Set(),slips=new Set(),used=new Set();for(const e of events){if(e.kind==='salary'){const key=e.month+':'+e.staffId;if(slips.has(key))throw Error('同人同月重複薪資結算');slips.add(key);for(const a of [...(e.advanceIds||[]),...(e.chargeIds||[])]){if(used.has(a))throw Error('借支或領料重複抵扣');used.add(a);}}if(e.kind==='salaryPay'){if(pays.has(e.salaryId))throw Error('薪資重複付款');pays.add(e.salaryId);const slip=events.find(s=>s.id===e.salaryId&&s.kind==='salary');if(!slip||slip.net!==e.amount)throw Error('薪資付款與結算不符');}}
+ for(const t of data.transactions||[]){const due=businessDue(t,events);if(t.voided&&due>0.009)throw Error('退款超過已收金額');const versions=new Set();for(const e of events.filter(e=>e.kind==='settlement'&&same(e.orderId,t.id))){if(versions.has(e.version))throw Error('同一版訂單重複收退款');versions.add(e.version);}}
+ const customers=new Set((data.walletEntries||[]).map(e=>String(e.customerId)));for(const c of customers){const p=walletParts(c,data.walletEntries);if(p.principal<-.009||p.bonus<-.009)throw Error('儲值本金或贈送金不能負值');}
+ for(const e of data.walletEntries||[])if((e.principal!==undefined||e.bonus!==undefined)&&round(Number(e.principal||0)+Number(e.bonus||0))!==round(e.amount))throw Error('儲值本金與贈送金合計不符');
+ return data;
+}
+
 function scheduleCloud(){clearTimeout(cloudTimer);const settings=read(DATA.settings,{});if(settings.autoSync!==false&&settings.shopID&&settings.syncToken){status('pending','已存本機 · 等待安全同步');cloudTimer=setTimeout(()=>cloudSync().catch(()=>{}),4000);return;}if(!settings.autoCloudBackup){status('pending','已存本機 · 自動同步已關閉');return;}status('pending','資料已存本機，等待背景備份');cloudTimer=setTimeout(()=>cloudBackup(read(DATA.settings,{})).catch(()=>{}),4000);}
 root.addEventListener?.('storage',e=>{if(e.key){cache.delete(e.key);emit(e.key);}else for(const key of listeners.keys()){cache.delete(key);emit(key);}});
 root.addEventListener?.('salon-local-update',e=>{cache.delete(e.key);emit(e.key);});
 root.addEventListener?.('online',()=>{scheduleCloud();});
-Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudVersions,cloudSync,startSync,mergeData,versionTips,financials,lineFinancials,walletBalance,walletTopup,walletOwnerId,claimWalletDevice,cloudSubscribe,cloudSnapshot:()=>cloudState}});
+Object.assign(root,{SalonStore:{DATA,DRAFT,PREFIX,read,subscribe,set,all,atomic,transaction,checkout,savePending,inventory,reviseOrder,money,day,dateTime,itemCost,draftSave,draftRead,backupPayload,validateBackup,restore,cloudBackup,cloudDownload,cloudVersions,cloudSync,startSync,mergeData,versionTips,financials,lineFinancials,walletBalance,walletTopup,walletOwnerId,claimWalletDevice,vipDiscount,businessOrder,settleOrder,businessDue,orderReceipt,businessCash,recordWork,saveSalary,paySalary,correctSalary,salaryDraft,monthlyBusiness,walletParts,validateBusiness,cloudSubscribe,cloudSnapshot:()=>cloudState}});
 })(window);
