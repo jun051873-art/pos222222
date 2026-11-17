@@ -67,3 +67,34 @@ html[data-salon-theme=pearl] .card{background:#fff!important}html[data-salon-the
 @media(min-width:1280px){.stats-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(min-width:1024px) and (max-width:1279px){.salon-sidebar{display:none!important}.mobile-header{display:flex!important}.mobile-quick-nav{display:grid!important}.mobile-menu{display:flex!important}main{padding-bottom:110px}.global-status{bottom:74px;left:14px;right:14px;max-width:none;text-align:center}.pos-layout{padding:14px}.pos-checkout{min-width:330px}}
 @media(max-width:480px){.stat-card{padding:16px!important}.stat-card .glass-icon{display:none}.stat-card .text-3xl{font-size:26px}.stat-card .text-sm{font-size:12px}.stats-grid{gap:12px}.salary-card header{flex-wrap:wrap}.salary-total{min-width:90px}.service-tools{gap:7px}.service-tools .style-shortcut{padding:7px;font-size:12px}.service-tools .style-shortcut svg{width:16px}}
+
+/* Business functions inherit the established glass cards and controls. */
+.business-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:14px}.business-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.business-row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid #94a3b822}.business-row span{min-width:0;overflow-wrap:anywhere}.business-row strong{white-space:nowrap}.business-scroll{max-height:360px;overflow:auto;margin-top:16px}@media(max-width:480px){.business-grid{grid-template-columns:1fr}}
+
+/* Cloud settings must remain readable on narrow phones. */
+.cloud-backup-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.cloud-backup-actions .btn { min-width:0; white-space:normal; line-height:1.5; }
+.cloud-backup-actions .btn svg { flex-shrink:0; }
+.pos-notification { max-width:calc(100vw - 2rem); white-space:normal; overflow-wrap:anywhere; bottom:calc(6.5rem + env(safe-area-inset-bottom, 0px)); }
+@media(max-width:640px) { .cloud-backup-actions { grid-template-columns:1fr; } .cloud-backup-actions .btn { width:100%; min-height:52px; padding:0.8rem 1rem; } }
+
+/* Field sizing uses available content width, including iPad sidebars. */
+.workspace-content,.page-heading,.card,.grid>*,.filter-field { min-width:0; }
+.input-field { box-sizing:border-box; max-width:100%; }
+input[type=date],input[type=month],input[type=datetime-local] { min-width:0; max-width:100%; }
+input::-webkit-date-and-time-value { text-align:left; min-width:0; }
+.order-toolbar { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); align-items:end; gap:14px; }
+.order-toolbar>* { min-width:0; grid-column:auto; grid-row:auto; }
+.order-toolbar .order-search { grid-column:1/-1; }
+.filter-field { display:flex; flex-direction:column; gap:6px; }
+.filter-label { display:block; font-size:13px; font-weight:600; color:#52697e; margin-bottom:4px; }
+.order-mode .btn { min-height:48px; padding:8px 12px; }
+[data-pos-modal] { min-width:0; max-height:90dvh; }
+[data-pos-modal]>div:first-child { gap:12px; flex-shrink:0; }
+[data-pos-modal] h3 { min-width:0; overflow-wrap:anywhere; }
+[data-pos-modal]>div:first-child>button { flex-shrink:0; }
+[data-pos-modal]>.flex-1 { min-height:0; min-width:0; }
+.report-tabs { flex-wrap:wrap; }
+.report-tabs button { flex:1 1 130px; white-space:normal; }
+.salary-lines>div>*,.wallet-history>div>* { min-width:0; overflow-wrap:anywhere; }
+@media(max-width:640px) { [data-pos-modal] { padding:18px; } [data-pos-modal] .grid-cols-2,[data-pos-modal] .grid-cols-3 { grid-template-columns:minmax(0,1fr); } .customer-toolbar { grid-template-columns:minmax(0,1fr); } .customer-toolbar>* { grid-row:auto!important; grid-column:1!important; } }

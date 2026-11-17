@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build.cjs",
-    "test": "node tests/pos-runtime.cjs && node tests/pos-ui.cjs && node tests/bridge-regression.cjs && node tests/audit-runtime.cjs && node tests/audit-ui.cjs && node tests/version-backup.cjs && node tests/next-runtime.cjs && node tests/next-ui.cjs"
+    "test": "node tests/pos-runtime.cjs && node tests/pos-ui.cjs && node tests/bridge-regression.cjs && node tests/audit-runtime.cjs && node tests/audit-ui.cjs && node tests/version-backup.cjs && node tests/next-runtime.cjs && node tests/next-ui.cjs && node tests/business-runtime.cjs && node tests/business-ui.cjs && node tests/integration-complete.cjs && node tests/integration-access-ui.cjs"
   },
   "devDependencies": {
     "@babel/core": "8.0.6",
