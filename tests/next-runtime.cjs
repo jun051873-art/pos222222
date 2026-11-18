@@ -15,4 +15,25 @@ f=fixture();S=f.store;f.set('salon_settings',{...S.all().settings,assistantFee:1
 const bulk=Array.from({length:10000},(_,i)=>({...o,id:'stress-'+i}));const start=performance.now();report=S.financials(bulk,expenses,S.all().stylists,S.all().settings,true);assert.equal(report.revenue,20000000);assert.equal(report.realRevenue,15000000);assert.equal(report.rows[0].serviceCommission,7500000);console.log('PASS 10,000-order report exact totals in '+Math.round(performance.now()-start)+' ms');
 f=fixture();S=f.store;srv=server(f,null);await S.claimWalletDevice();await S.walletTopup({id:'topup',customerId:'c',amount:2000});await S.walletTopup({id:'topup',customerId:'c',amount:2000});assert.equal(S.walletBalance('c'),2000);const paid=await S.checkout({...f.input('prepaid'),paymentMethod:'儲值金'});assert.equal(S.walletBalance('c'),600);const ledgerBefore=JSON.stringify(S.all());await assert.rejects(S.restore({...S.backupPayload(),walletEntries:[]}),/儲值紀錄/);assert.equal(JSON.stringify(S.all()),ledgerBefore);await assert.rejects(S.checkout({...f.input('too-much'),paymentMethod:'儲值金'}),/不足/);assert.equal(S.all().transactions.length,1);await S.reviseOrder(paid,true);assert.equal(S.walletBalance('c'),2000);await assert.rejects(S.reviseOrder(paid,true),/已作廢/);assert.equal(S.walletBalance('c'),2000);assert.equal((await S.cloudVersions(S.all().settings)).length,0);console.log('PASS recharge idempotency, atomic debit, insufficient-funds rejection and one-time void refund; owner document hidden from backup history');
 f.data.set(S.PREFIX+'wallet-device','other-device');await assert.rejects(S.walletTopup({id:'wrong',customerId:'c',amount:100}),/指定收銀/);await assert.rejects(S.claimWalletDevice(),/另一台/);console.log('PASS immutable server owner prevents a second device claiming wallet write access');
+// A versioned shop should get three lightweight checks in parallel. Keep the
+// actual new backup read-back, but don't download it again via a second sync.
+f=fixture();S=f.store;
+const payload=S.backupPayload(), stamp='2026-10-14T00:00:00.000Z';
+srv=server(f,payload);
+srv.versions.set('v-existing',{name:'projects/test/documents/Backups/v-existing',createTime:stamp,updateTime:stamp,fields:{parentVersion:{stringValue:'legacy:base'},content:{stringValue:JSON.stringify(payload)}}});
+const fetchFixture=f.ctx.fetch,calls=[];let readers=0;
+f.ctx.fetch=async(raw,opt={})=>{
+ const u=new URL(raw),key=u.pathname.split('/').pop();calls.push([key,opt.method||'GET',u.searchParams.getAll('mask.fieldPaths')]);
+ if(key==='test-key'||key==='business-protocol-v3'||key==='Backups') { const started=++readers;if(key==='test-key'){await Promise.resolve();assert.ok(readers>=started+2,'cloud metadata requests must start together');} }
+ return fetchFixture(raw,opt);
+};
+await S.cloudSync(true);
+assert.ok(calls.filter(([key])=>key==='test-key').every(([, ,mask])=>mask.includes('kind')));
+f.set('salon_customers',[...S.all().customers,{id:'local-second',name:'另一本機新客'}]);calls.length=0;
+await S.cloudSync(true);
+const written=new URL(srv.writes.at(-1)).pathname.split('/').pop();
+assert.equal(calls.filter(([key,verb])=>key===written&&verb==='GET').length,1);
+const received=await S.cloudDownload(S.all().settings);
+assert.ok(received.customers.some(c=>c.id==='local-second'));
+console.log('PASS cloud checks run in parallel and each new backup is read back once');
 })().catch(e=>{console.error(e);process.exitCode=1});

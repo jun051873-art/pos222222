@@ -28,7 +28,8 @@ function transaction(build){const run=()=>new Promise(resolve=>setTimeout(resolv
 function set(key,next,expected){return transaction(()=>{const prev=read(key,expected);if(typeof next!=='function'&&JSON.stringify(prev)!==JSON.stringify(expected))throw Error('資料剛在另一個分頁更新，請重新核對再儲存。');let value=typeof next==='function'?next(prev):next;if(['salon_services','salon_customers','salon_stylists','salon_expenses'].includes(key)&&Array.isArray(prev)&&Array.isArray(value)){const ids=new Set(value.map(x=>String(x.id)));value=[...value,...prev.filter(x=>!ids.has(String(x.id))).map(x=>({...x,archived:true,archivedAt:x.archivedAt||new Date().toISOString()}))];}atomic({[key]:value});});}
 const id=()=>crypto.randomUUID();
 function money(v){const n=Number(v);if(v===''||v===null||!Number.isFinite(n)||n<0||n>10000000)throw Error('金額必須為 0 至 10,000,000 的有效數字');return Math.round(n*100)/100;}
-function dateTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';const parts=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d);return parts.replace(' ','T');}
+let taipeiDateTime;
+function dateTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return '';taipeiDateTime??=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});return taipeiDateTime.format(d).replace(' ','T');}
 function day(value){if(/^\d{4}-\d{2}-\d{2}$/.test(value||''))return value;return dateTime(value).slice(0,10);}
 function itemAmount(item){return money(item.price)-money(item.discount||0);}
 function itemCost(item,amount){const cost=money(item.cost||0);return item.isProduct||item.costMode==='fixed'||(!item.costMode&&cost>100)?cost:amount*cost/100;}
@@ -154,14 +155,20 @@ async function cloudVersions(settings){
  return result.sort((a,b)=>b.createTime.localeCompare(a.createTime)||b.name.localeCompare(a.name));
 }
 async function cloudHead(settings){
- const base=cloudURL(settings),r=await cloudFetch(base,{cache:'no-store'});const legacy=r.status===404?null:await responseJSON(r);
- const gate=await businessCloudGate(settings),versions=await cloudVersions(settings);if(gate&&versions.some(v=>v.createTime>gate.createTime&&v.fields?.kind?.stringValue!=='legacy-snapshot'&&v.fields?.businessSchema?.integerValue!=='3'))throw Error('防護啟用後仍有舊版寫入，請核對後台規則；已停止同步，保留全部版本');const latest=versions.find(v=>v.fields?.kind?.stringValue!=='legacy-snapshot');
+ const base=cloudURL(settings);
+ // Only read legacy metadata when checking a versioned shop. The legacy payload
+ // is needed only when no versioned backup exists or when explicitly restoring it.
+ const [legacy,gate,versions]=await Promise.all([
+   cloudFetch(base+'?mask.fieldPaths=kind',{cache:'no-store'}).then(r=>r.status===404?null:responseJSON(r)),
+   businessCloudGate(settings),cloudVersions(settings)
+ ]);
+ if(gate&&versions.some(v=>v.createTime>gate.createTime&&v.fields?.kind?.stringValue!=='legacy-snapshot'&&v.fields?.businessSchema?.integerValue!=='3'))throw Error('防護啟用後仍有舊版寫入，請核對後台規則；已停止同步，保留全部版本');const latest=versions.find(v=>v.fields?.kind?.stringValue!=='legacy-snapshot');
  // Older application versions can still write the legacy record until backend rules are locked.
  if(legacy&&latest&&legacy.updateTime>latest.createTime)throw Error('偵測到舊版裝置更新原始備份，已停止操作。所有版本仍保留，請先核對後台資料');
- if(!latest)return {document:legacy,versionId:'legacy',versions};
+ if(!latest){const document=legacy?await responseJSON(await cloudFetch(base,{cache:'no-store'})):null;if(document&&document.updateTime!==legacy.updateTime)throw Error('原始備份在讀取時發生變更，請稍後再試');return {document,versionId:'legacy',versions,gate};}
  const document=await responseJSON(await cloudFetch(base+'/Backups/'+encodeURIComponent(latest.versionId),{cache:'no-store'}));
  if(document.updateTime!==latest.updateTime)throw Error('備份版本在讀取時發生變更，已停止操作');
- return {document,versionId:latest.versionId,versions};
+ return {document,versionId:latest.versionId,versions,gate};
 }
 async function cloudBackup(settings,manual=false,mergeParents=[]){if(cloudBusy)throw Error('雲端備份處理中，請稍候');clearTimeout(cloudTimer);const startRevision=revision;cloudBusy=true;status('saving','雲端備份中，本機可繼續開單');try{
  const url=cloudURL(settings),metaKey=cloudMetaKey(settings);const meta=read(metaKey,{});
@@ -169,7 +176,7 @@ async function cloudBackup(settings,manual=false,mergeParents=[]){if(cloudBusy)t
  const head=await cloudHead(settings),current=head.document;if(versionTips(head.versions).length>1&&!mergeParents.length)throw Error('多台裝置有不同的新版本，請使用安全同步合併；所有版本仍保留');
  if(current&&meta.updateTime&&current.updateTime!==meta.updateTime)throw Error('雲端已被其他裝置更新，請先核對，未覆蓋備份');
  if(!manual&&current&&!meta.updateTime)throw Error('請先核對既有雲端資料');
- const payload=backupPayload();await businessCloudGate(settings,needsBusinessProtocol(payload));payload.settings={...payload.settings,...settings};if(current)protectCloud(payload,await unpackCloud(current.fields?.content?.stringValue));const {content,rawBytes,storedBytes}=await packCloud(payload);
+ const payload=backupPayload();if(!head.gate&&needsBusinessProtocol(payload))await businessCloudGate(settings,true);payload.settings={...payload.settings,...settings};if(current)protectCloud(payload,await unpackCloud(current.fields?.content?.stringValue));const {content,rawBytes,storedBytes}=await packCloud(payload);
  // Preserve an exact copy of the original record as well; it is never used as a new upload head.
  if(current&&head.versionId==='legacy'&&!head.versions.some(v=>v.versionId==='legacy-original')){
  const archiveURL=url+'/Backups/legacy-original';const archiveFields={...current.fields,kind:{stringValue:'legacy-snapshot'}};
@@ -252,7 +259,8 @@ async function cloudSync(force=false){
  await transaction(()=>{if(revision!==start||interactionBusy())throw Error('本機正在更新，稍後自動重試');const after={};if(!dataEqual(local,merged)){after[PREFIX+'before-sync']=local;for(const [k,key]of Object.entries(DATA))after[key]=merged[k]??[];}
  if(remote){after[baseKey]=remote;after[cloudMetaKey(settings)]={confirmed:true,versionId:head.versionId,updateTime:head.document.updateTime};}
  syncApplying=true;try{atomic(after);}finally{syncApplying=false;}});
- if(needUpload){await cloudBackup(read(DATA.settings,{}),true,tips.map(v=>v.versionId));const saved=await cloudDownload(read(DATA.settings,{}),read(cloudMetaKey(settings),{}).versionId);syncApplying=true;try{atomic({[baseKey]:saved});}finally{syncApplying=false;}}
+ // cloudBackup verifies its read-back and atomically saves the confirmed sync base.
+ if(needUpload)await cloudBackup(read(DATA.settings,{}),true,tips.map(v=>v.versionId));
  lastProbe=probe;lastProbeScope=scope;lastFullCheck=Date.now();lastSyncRevision=revision;
  status('saved','已同步 · '+dateTime(new Date()).slice(11),{at:new Date().toISOString()});
  }catch(e){status('error',e.message);throw e;}finally{syncBusy=false;}

@@ -299,7 +299,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'}, {id:'ownSalary',icon:User,label:'我的薪資'}, {id:'salary',icon:UserCog,label:'薪資管理'} ].filter(item=>access.allowed(item.id)&&(settings.access?.enabled||!['ownSalary','salary'].includes(item.id))).map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.0</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.1</div>
                     </aside>
 
                     {/* 手機版全螢幕選單 */}
@@ -1861,9 +1861,9 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                                     <button onClick={() => handleModeChange('date')} className={`btn btn-secondary ${dateMode==='date'?'font-bold':''}`}>日</button>
                                     <button className="btn btn-secondary" onClick={()=>{setDateMode('range');setQueryDate(getCurrentDateLocal().slice(0,7)+'-01');}}>日期區間</button>
                                 </div></div>
-                                <label className="filter-field"><span className="filter-label">{dateMode==='month'?'查詢月份':dateMode==='range'?'開始日期':'查詢日期'}</span><input aria-label="查單開始日期" type={dateMode==='range'?'date':dateMode} className="input-field font-bold" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/></label>
-                                {dateMode==='range'&&<label className="filter-field"><span className="filter-label">結束日期</span><input aria-label="查單結束日期" type="date" className="input-field" value={rangeEnd} onChange={e=>setRangeEnd(e.target.value)}/></label>}
-                                <label className="filter-field"><span className="filter-label">設計師</span><select aria-label="查單設計師" className="input-field" value={filterStylist} onChange={(e) => setFilterStylist(e.target.value)}><option value="all">全體人員</option>{safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></label>
+                                <div className="order-filter-fields"><label className="filter-field"><span className="filter-label">{dateMode==='month'?'查詢月份':dateMode==='range'?'開始日期':'查詢日期'}</span><input aria-label="查單開始日期" type={dateMode==='range'?'date':dateMode} className="input-field order-calendar font-bold" value={queryDate} onChange={e=>setQueryDate(e.target.value)}/></label>
+                                {dateMode==='range'&&<label className="filter-field"><span className="filter-label">結束日期</span><input aria-label="查單結束日期" type="date" className="input-field order-calendar" value={rangeEnd} onChange={e=>setRangeEnd(e.target.value)}/></label>}
+                                <label className="filter-field"><span className="filter-label">設計師</span><select aria-label="查單設計師" className="input-field" value={filterStylist} onChange={(e) => setFilterStylist(e.target.value)}><option value="all">全體人員</option>{safeStylists.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></label></div>
                                 <label className="filter-field order-search"><span className="filter-label">搜尋訂單</span><div className="search-field"><Search size={18}/><input aria-label="搜尋單號或姓名" type="text" className="input-field" placeholder="搜尋單號或姓名" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/></div></label>
                             </div>
                         </div>
@@ -1942,7 +1942,7 @@ const handleUpdateOrder = async updatedOrder => {try{await SalonStore.reviseOrde
                             </div>
                         )}
 
-                        <button className="btn btn-secondary my-3" hidden={visibleCount>=filteredOrders.length} onClick={()=>setVisibleCount(n=>n+60)}>載入更多訂單（共 {filteredOrders.length} 筆）</button><details className="card p-4 my-4"><summary>查看作廢單據</summary>{voidedOrders.slice(0,visibleCount).map(t=><div key={t.id} className="p-3 border-b">{SalonStore.dateTime(t.date)} · {t.customerName} · {formatCurrency(t.total)}<p>原因：{t.voidReason} · 作廢時間：{SalonStore.dateTime(t.voidedAt)}</p><BusinessOrderDetails order={t} onAction={(mode,order)=>setBusinessModal({mode,order})}/></div>)}</details>{businessModal&&<BusinessOrderModal {...businessModal} onClose={()=>setBusinessModal(null)}/>} {editingOrder && <EditOrderModal order={editingOrder} onClose={()=>setEditingOrder(null)} onSave={handleUpdateOrder}/>}
+                        {visibleCount<filteredOrders.length&&<button className="btn btn-secondary my-3" onClick={()=>setVisibleCount(n=>n+60)}>載入更多訂單（共 {filteredOrders.length} 筆）</button>}<details className="card p-4 my-4"><summary>查看作廢單據</summary>{voidedOrders.slice(0,visibleCount).map(t=><div key={t.id} className="p-3 border-b">{SalonStore.dateTime(t.date)} · {t.customerName} · {formatCurrency(t.total)}<p>原因：{t.voidReason} · 作廢時間：{SalonStore.dateTime(t.voidedAt)}</p><BusinessOrderDetails order={t} onAction={(mode,order)=>setBusinessModal({mode,order})}/></div>)}</details>{businessModal&&<BusinessOrderModal {...businessModal} onClose={()=>setBusinessModal(null)}/>} {editingOrder && <EditOrderModal order={editingOrder} onClose={()=>setEditingOrder(null)} onSave={handleUpdateOrder}/>}
                     </div>
                 );
             };

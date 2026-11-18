@@ -98,3 +98,11 @@ input::-webkit-date-and-time-value { text-align:left; min-width:0; }
 .report-tabs button { flex:1 1 130px; white-space:normal; }
 .salary-lines>div>*,.wallet-history>div>* { min-width:0; overflow-wrap:anywhere; }
 @media(max-width:640px) { [data-pos-modal] { padding:18px; } [data-pos-modal] .grid-cols-2,[data-pos-modal] .grid-cols-3 { grid-template-columns:minmax(0,1fr); } .customer-toolbar { grid-template-columns:minmax(0,1fr); } .customer-toolbar>* { grid-row:auto!important; grid-column:1!important; } }
+
+/* Separate mode, filters and search; contain iPad Safari's native date controls. */
+.order-toolbar { display:flex; flex-direction:column; align-items:stretch; gap:16px; min-width:0; }
+.order-filter-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,232px),1fr)); gap:16px 24px; }
+.order-filter-fields .filter-field { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; overflow:hidden; padding:4px; }
+.order-filter-fields .input-field { display:block; inline-size:100%; max-inline-size:100%; min-inline-size:0; box-sizing:border-box; height:48px; margin:0; }
+.order-filter-fields .order-calendar { -webkit-appearance:none; appearance:none; }
+.order-calendar::-webkit-datetime-edit,.order-calendar::-webkit-date-and-time-value { min-inline-size:0; max-inline-size:100%; overflow:hidden; text-overflow:ellipsis; }
