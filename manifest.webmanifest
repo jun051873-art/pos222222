@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "專屬空間美髮開單",
+  "short_name": "ES 美髮開單",
+  "lang": "zh-TW",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3eae0",
+  "theme_color": "#f3eae0",
+  "icons": [
+    {
+      "src": "icons/es-salon-v1-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/es-salon-v1-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
