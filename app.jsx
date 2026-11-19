@@ -295,11 +295,11 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
             return (
                 <SalonContext.Provider value={{safeTransactions,showToast,confirmAction,transactions,setTransactions,customers,setCustomers,safeCustomers,safeStylists,safeSettings,getThemeClasses,safeExpenses,setExpenses,safeServices,setServices,setInventoryLogs,safeInventoryLogs,setPendingOrders,safePendingOrders,setStylists,settings,setSettings}}><AccessBoundary settings={settings}><div className="flex h-screen overflow-hidden bg-slate-100">
                     <aside className="salon-sidebar hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 z-20 shadow-sm">
-                        <div className="p-6 hidden lg:flex flex items-center gap-3"><div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">S</div><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
+                        <div className="p-6 hidden lg:flex flex items-center gap-3"><img src="icons/es-salon-v1-180.png" alt="ES 專屬空間美髮開單" width="40" height="40" className="w-10 h-10 rounded-xl shrink-0 object-cover"/><div className="font-bold text-lg text-slate-800">專屬空間沙龍</div></div>
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'}, {id:'ownSalary',icon:User,label:'我的薪資'}, {id:'salary',icon:UserCog,label:'薪資管理'} ].filter(item=>access.allowed(item.id)&&(settings.access?.enabled||!['ownSalary','salary'].includes(item.id))).map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.1</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.2</div>
                     </aside>
 
                     {/* 手機版全螢幕選單 */}
@@ -325,7 +325,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         {/* 手機版頂欄 */}
                         <div className="mobile-header lg:hidden bg-white border-b p-4 h-16 flex justify-between items-center z-30 shadow-sm">
                             <div className="font-bold flex items-center gap-2 text-slate-800">
-                                <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white">S</div> 專屬空間
+                                <img src="icons/es-salon-v1-180.png" alt="ES 專屬空間美髮開單" width="36" height="36" className="w-9 h-9 rounded-lg shrink-0 object-cover"/> 專屬空間
                             </div>
                             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg active:bg-slate-200"><Menu size={24}/></button>
                         </div>
