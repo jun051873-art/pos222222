@@ -117,7 +117,7 @@ function protectCloud(local,remote){
  }
 }
 async function cloudFetch(url,options={}){if(!root.AbortController)return fetch(url,options);const controller=new root.AbortController(),timer=setTimeout(()=>controller.abort(),25000);try{return await fetch(url,{...options,signal:controller.signal});}catch(e){if(e.name==='AbortError')throw Error('雲端連線逾時，本機資料仍保留；請重試');throw e;}finally{clearTimeout(timer);}}
-async function responseJSON(r){let data;try{data=await r.json();}catch{throw Error('雲端回應格式異常');}if(!r.ok)throw Error(r.status===403?'雲端權限拒絕存取，請檢查 Firebase 規則':data.error?.message||'雲端連線失敗 ('+r.status+')');return data;}
+async function responseJSON(r){let data;try{data=await r.json();}catch{throw Error('雲端回應格式異常');}if(!r.ok){const message=data.error?.message||'';throw Error(r.status===403?'雲端權限拒絕存取，請檢查 Firebase 規則':/requires an index/i.test(message)?'雲端查詢缺少索引，暫停操作；本機與既有備份未被覆蓋。請更新網頁後重試':message||'雲端連線失敗 ('+r.status+')');}return data;}
 const CLOUD_LIMIT=900000,MAX_BACKUP_BYTES=32*1024*1024;
 async function digest(bytes){if(!root.crypto?.subtle)throw Error('此瀏覽器無法驗證壓縮備份，請使用更新的瀏覽器；本機資料未變更');return Array.from(new Uint8Array(await root.crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');}
 function toBase64(bytes){let text='';for(let i=0;i<bytes.length;i+=8192)text+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(text);}
@@ -233,7 +233,11 @@ function mergeData(base,local,remote){
 }
 function versionTips(versions){const consumed=new Set();for(const v of versions){const p=v.fields?.parentVersion?.stringValue;if(p)consumed.add(p.split(':')[0]);for(const a of v.fields?.mergedVersions?.arrayValue?.values||[])consumed.add(a.stringValue);}return versions.filter(v=>v.fields?.kind?.stringValue!=='legacy-snapshot'&&!consumed.has(v.versionId));}
 let lastProbe='',lastProbeScope='',lastFullCheck=0,lastSyncRevision=-1;
-async function cloudProbe(settings){const r=await responseJSON(await cloudFetch(cloudURL(settings)+'/Backups?pageSize=5&orderBy=__name__%20desc&mask.fieldPaths=kind',{cache:'no-store'}));return JSON.stringify((r.documents||[]).map(d=>[d.name,d.updateTime]));}
+async function cloudProbe(settings){
+ // Default document listing needs no custom descending-name index. Read every
+ // metadata page so a new branch beyond the first page cannot be missed.
+ const versions=await cloudVersions(settings);return JSON.stringify(versions.map(d=>[d.name,d.updateTime]));
+}
 function syncBaseKey(settings){return cloudMetaKey(settings)+':base';}
 function dataEqual(a,b){const clean=x=>Object.fromEntries(Object.entries(x||{}).filter(([k])=>!deviceKeys.includes(k)));return Object.keys(DATA).every(k=>equivalent(k==='settings'?clean(a[k]):a[k]??[],k==='settings'?clean(b[k]):b[k]??[]));}
 function interactionBusy(){return !!(root.document?.querySelector('[data-pos-modal],.style-overlay')||/^(INPUT|TEXTAREA|SELECT)$/.test(root.document?.activeElement?.tagName)||draftRead()?.cart?.length);}

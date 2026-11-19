@@ -299,7 +299,7 @@ const isSyncing = false; // 將狀態改為常數，永遠鎖定在 false
                         <nav className="flex-1 p-4 space-y-2">
                             {[ {id:'pos', icon:CreditCard, label:'收銀開單'}, {id:'orders', icon:ClipboardList, label:'查單管理'}, {id:'report', icon:Activity, label:'營運報表'}, {id:'customers', icon:User, label:'顧客資料'}, {id:'staff', icon:UserCog, label:'人員管理'}, {id:'inventory', icon:Box, label:'商品庫存'}, {id:'settings', icon:Settings, label:'系統設定'}, {id:'ownSalary',icon:User,label:'我的薪資'}, {id:'salary',icon:UserCog,label:'薪資管理'} ].filter(item=>access.allowed(item.id)&&(settings.access?.enabled||!['ownSalary','salary'].includes(item.id))).map(item=>(<button key={item.id} onClick={()=>setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-bold ${activeTab===item.id?'bg-indigo-50 text-indigo-600':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><item.icon size={20}/>{item.label}</button>))}
                         </nav>
-                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.2</div>
+                        <div className="p-4 border-t border-slate-100 text-xs text-center text-slate-400 font-medium">Salon POS · 1007.3</div>
                     </aside>
 
                     {/* 手機版全螢幕選單 */}
