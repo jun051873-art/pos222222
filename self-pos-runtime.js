@@ -10,7 +10,7 @@ function read(key,fallback){const raw=localStorage.getItem(key);const old=cache.
 function publish(keys){for(const key of keys){cache.delete(key);emit(key);}if(keys.some(k=>Object.values(DATA).includes(k))){revision++;root.dispatchEvent(new Event('pos-data-saved'));if(!syncApplying)scheduleCloud();}}
 function subscribe(key,fn){if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);return()=>listeners.get(key).delete(fn);}
 function customerRecord(c){return {...c,name:c.name||c.Name||'',phone:c.phone||c.Phone||'',visits:Number(c.visits??c.Visits??0),totalSpend:Number(c.totalSpend??c.TotalSpend??0)};}
-function all(){return Object.fromEntries(Object.entries(DATA).map(([name,key])=>[name,read(key,name==='settings'?{}:[])]));}
+function all(){return Object.fromEntries(Object.entries(DATA).map(([name,key])=>{const value=read(key,name==='settings'?{}:[]);return [name,name==='settings'?(value&&typeof value==='object'&&!Array.isArray(value)?value:{}):(Array.isArray(value)?value:[])];}));}
 function atomic(after){
  B.recover();if(!syncApplying)accessCheckWrite(all(),after);if(after[DATA.businessEvents]||all().businessEvents.length)validateBusiness({...all(),...Object.fromEntries(Object.entries(DATA).filter(([,k])=>k in after).map(([n,k])=>[n,after[k]]))});const encoded=Object.entries(after).filter(([k,v])=>{const entry=cache.get(k);return !entry||entry.value!==v||entry.raw!==localStorage.getItem(k);}).map(([k,v])=>[k,codec.stringify(v)]).filter(([k,v])=>localStorage.getItem(k)!==v);if(!encoded.length)return;
  const changed=encoded.map(([k])=>[k,after[k]]),journalKey=B.PREFIX+'journal',journal=codec.stringify({after:Object.fromEntries(changed)});
